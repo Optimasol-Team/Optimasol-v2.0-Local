@@ -1,0 +1,4 @@
+Ce module "weather" a son point d'entrée "weather_main".
+il permet de charger les données nécessaire à la récupération des données d'irradiance.
+Les données sont : 
+Localisation

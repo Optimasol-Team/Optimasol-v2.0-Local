@@ -1,0 +1,53 @@
+Les configs seront réparties sur plusieurs fichiers YAML (adaptés à la config). 
+Toutes ces configs vont être crées une seule fois au début et peuvent être modifiées après. 
+Ils devront être accessibles soit via l'interface, soit directement en modifiant le code yaml. 
+
+-Un fichier pour les configs générales : 
+   Nom
+   mail
+   Localisation
+   ...
+
+-les configs météo : 
+   (La même position)
+   altitude
+   pas de requêtes météo
+   horizon de la météo
+   clé api (par défaut PVGIS)
+   module météo secondaire si PVGIS ne répond pas (optionnel) - par défaut open-meteo + PVLib.
+   
+-Les configs panneaux : 
+   Surface
+   inclinaison
+   tilt
+   azimuth
+   rendement 
+   ... 
+
+-Config MQTT
+   adresse broker : localhost (par défaut)
+   port. 
+   numéro de série du routeur
+
+   
+-Paramètre chauffe eau :
+   volume 
+   puissance nominale
+   type
+   température eau froide (soit par défaut, soit un programme qui l'ajuste, soit un mini aprentissage selon les données historiques & les données que renvoie le routeur)
+   ... (à ajouter)
+
+-Config thermometer :
+   (à faire les configs nécessaires à la connexion avec le thermomètre)
+
+-Paramètres logique :
+   pas de la discrétisation - décisions
+   longueur de l'horizon
+
+-Config exigences : 
+   organiser efficacement les exigences de l'utilisateur (température min oui ou non, températures à des points données, consmmmation à chaque point...) 
+   scénarios, vacances, absence, weekend, tout ça doit être configurable. 
+    (à faire)
+
+
+   
