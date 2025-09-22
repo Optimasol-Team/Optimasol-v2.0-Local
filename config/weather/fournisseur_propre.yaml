@@ -1,0 +1,6 @@
+#Ce fichier de configurations, concerne le cas où l'utisateur sougaite utiliser son propre fournisseur de météo
+
+#Le programme d'interface doit interagir avec ces fichiers pour ajuster les paramètres.
+
+nom_fournisseur : "" # Nom du fournisseur (codifié dans le programme, string) 
+api_key : "" # Clé API (string) 

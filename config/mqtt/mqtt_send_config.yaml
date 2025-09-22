@@ -1,0 +1,22 @@
+#Ce fichier concerne les configurations de l'envoi MQTT. 
+#Les données qui existent ici doivent être gérés par un programme externe. 
+#Par exemple, les topics MQTT qui existent sur ce fichier doivent être déduites par un programme selon l'identifiant du routeur.
+
+broker:
+   host: "test.mosquitto.org" #Le host doit être modifié par le bon host, en pratique c'est local host (dans le raspberry)
+   port: 1883 #Le port doit être modifié par le bon port, en pratique c'est 1883
+   username:  ""     #Facultatif, ça sert surtout en cas de broker public & si l'utilisateur se soucie de la sécurité
+   password:  ""     #Facultatif, ça sert surtout en cas de broker public & si l'utilisateur se soucie de la sécurité
+
+client_id: "Optimasol" # ça sert pour que l'utilisateur voit dans une interface routeur ce que le logiciel envoie.
+
+topics:
+   mode: "PV111/SETMODE" # C'est le topic qui concerne le mode tout ou rien. 
+   gradation1: "PV111/DIMMER1" # C'est le topic de la gradation de la sortie 1
+   gradation2: "PV111/DIMMER2" # C'est le topic de la gradation de la sortie 2
+   display: "PV111/SETDISPLAY"  #C'est le topic qui permet d'allumer ou éteindre l'écran (utile pour l'interface)
+   reset: "PV111/RESET"  #Topic de reboot du roouteur en cas de problèmes ... 
+   # Les topics sont nombreux, les autres sont moins utiles, à ajouter quand on en a besoin. 
+   # Ce fichier doit être maintenu par un programme externe qui déduit les topics selon l'identifiant du routeur. ceci est juste un exemple.
+
+

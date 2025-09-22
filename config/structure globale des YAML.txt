@@ -1,0 +1,68 @@
+Structure globale des fichiers YAML : 
+
+C'est un type de fichiers de configs avec structure clé - valeur. 
+
+
+#Exemple : 
+"""
+serveur : "google.com"
+chauffe_nuit : "True" 
+.
+.
+.
+"""
+
+Les commetaires se font avec un # comme en python. 
+
+On peut aussi faire des groupes impbriquées : 
+#Exemple : 
+"""
+etat :
+   chauffe : "On"
+   electricite : "True"
+   .... 
+
+soleil :
+   irradiance : 900 
+   production : 400
+   ... 
+
+
+"""
+
+
+On peut aussi faire des listes : 
+#exemple : 
+"""
+soleil : 
+   -900
+   -450
+   -309
+   ...
+
+
+"""
+
+On peut aussi combiner liste et objets imbriqués :
+#exemple : 
+"""
+servers:
+  - broker: mqtt.eclipse.org
+    port: 1883
+  - broker: test.mosquitto.org
+    port: 1884
+"""
+
+Comment on code sur python : 
+
+Sur un code, il faut importer la bibliothèque yaml qui s'installe avec : "pip install pyyaml"
+disons que path est le chemin vers ce fichier yaml, on fait : 
+
+"""
+with open(path, "r") as f :
+   C = yaml.safe_load(f) 
+   """
+
+   Maintenant C est un dico contenant toutes ces config qui existent sur C. 
+
+

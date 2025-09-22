@@ -1,0 +1,10 @@
+#Ce fichier présente le classement des fournisseurs météo selon leur fiabilité. 
+# Il y aurait un classement par défaut initialement mis par le développeur.
+# Si l'utilisateur a coché l'option "ajusteur_ranking", un programme dans weather va ajuster ce classement 
+# en fonction des données historiques. 
+# En parallèle si l'utilisateur a coché l'option d'utiliser un fournisseur spécifique, 
+# Un programme va mettre ce fournisseur en tête de liste. 
+
+fournisseurs :
+   - "openmeteo" 
+   # A compléter. (à remplir par yongxu )

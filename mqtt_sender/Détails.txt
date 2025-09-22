@@ -1,0 +1,24 @@
+Le but de ce module c'est évidemment d'envoyer les messages générées par le coeur du logiciel. 
+
+Il contient deux fichiers : 
+   - config_loader.py : 
+      Le but de ce module c'est de charger les configurations depuis le fichier de configuration qui existe dans le dossier config. 
+      L'idée c'est qu'il charge les données et il les met dans des variables. 
+      Comme ça on évite de charger à chaque fois les configurations à chaque fois qu'on veur envoyer des messages aur roouteur 
+   - sender.py : 
+      Le but c'est de contenir une fonction send(message, tout les données nécessaires à l'envoi). 
+      Une fois on exécute cette fonction, elle envoie le bon message dans le bon topic. 
+
+Comment ça doit se passer niveau programme principal? : 
+   A l'exécution du programme principal, le programme doit commencer par charger la config par config_loader. 
+   En important ce module, on dispose automatiquement des données nécessairement stockées dans des variables dans ce fichier.
+   Ensuite, à chaque fois qu'il y a un message généré par le module de logique principale, le programme doit appeler la fonction send.
+
+Et si les configs changent : 
+   On demandera à l'utilisateur de redémarrer le programme. 
+   Ou bien programme qui redémarre qui automatiquement (par l'interface peut être ... des perspectives à voir)
+
+
+Remarque : Le module paho.mqtt doit être de version "pip install "paho-mqtt<2.0". "
+Sinon, ça pose problème concernant l'exécution de codes, ce problème est à prendre en compte dans les requirements.txt
+
