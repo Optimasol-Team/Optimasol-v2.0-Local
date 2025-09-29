@@ -8,7 +8,7 @@ Auteur : @anaselb
 
 from pathlib import Path 
 import yaml 
-from .config_model import Position, Requetes, Features, Installation_PV
+from config_model import Position, Requetes, Features, Installation_PV
 
 PATH_DIR = Path(__file__).parent.resolve() # C'est le dossier weather. 
 Dir_project = PATH_DIR.parent #C'est la racine du projet.
