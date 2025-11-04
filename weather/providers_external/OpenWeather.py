@@ -160,13 +160,3 @@ def openweather_solar(latitude: float, longitude: float, altitude: float, timezo
             df[col] = np.nan
     df = _resample(df[["GHI", "DNI", "DHI", "Temperature", "Wind"]], pas_de_temps, "mean")
     return df
-
-def main():
-df = openweather_solar(50.63, 3.06, 20, "Europe/Paris", 48, 60, api_key="YOUR_KEY", onecall=True)
-
-
-out_csv = "open_meteo_forecast.csv"
-    df.to_csv(out_csv)
-    print(f"CSV 已导出：{out_csv}")
-if __name__ == "__main__":
-    main()
