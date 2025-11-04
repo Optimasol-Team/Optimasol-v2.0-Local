@@ -78,11 +78,11 @@ def _weather_factor(index: pd.DatetimeIndex, cloudiness: float = 0.35, wind_cool
     base = 1.0 - cloudiness  # e.g., 0.65 if cloudiness=0.35
     noise = rng.normal(0, 0.08, size=len(index))
 
-    #  用 numpy 数组而不是 Pandas Index
+  
     hours = index.hour.to_numpy() + index.minute.to_numpy() / 60.0
     midday = np.exp(-((hours - 12.0) ** 2) / (2 * 2.5 ** 2))
 
-    #  明确返回 np.ndarray
+ 
     return np.clip(base + noise + wind_cooling * midday, 0.0, 1.0).astype(float)
 
 
