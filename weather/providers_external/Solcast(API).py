@@ -31,25 +31,25 @@ def _date_index(timezone: str, horizon_h: int, step_min: int) -> pd.DatetimeInde
 
 def _panel_orientation_factor(local_time: pd.DatetimeIndex,
                               azimuth: float, tilt: float, longitude: float) -> np.ndarray:
-    # 转成 numpy，避免 pandas Index 的不可变问题
+   
     hours = local_time.hour.to_numpy() + local_time.minute.to_numpy() / 60.0
 
-    # 以中午为峰值的简化日变化
+    
     x = (hours - 12.0) / 6.0
     diurnal = np.clip(1.0 - x**2, 0.0, 1.0)
 
-    # 方位角惩罚（南向180°最佳）
+   
     az_err = abs(((azimuth - 180.0 + 180.0) % 360.0) - 180.0)
     az_factor = max(0.2, 1.0 - az_err / 180.0)
 
-    # 倾角惩罚（~32°最佳）
+  
     tilt_opt = 32.0
     tilt_factor = max(0.3, 1.0 - abs(tilt - tilt_opt)/90.0)
 
-    # 清晨/傍晚平滑衰减 + 经度轻微相位
+    
     phase = (longitude % 15.0) / 15.0 * math.pi/8.0
     smooth_core = 0.5 * (1.0 + np.cos(np.clip((np.abs(x) - 1.0 + phase), 0, 1) * math.pi))
-    # 用 np.where 避免对“索引”原地赋值
+
     smooth = np.where((x < -1) | (x > 1), 0.0, smooth_core)
 
     return diurnal * az_factor * tilt_factor * smooth
@@ -80,10 +80,10 @@ def _simulate_pv_power(index_local: pd.DatetimeIndex,
     p_dc = capacity_kwp * 1000.0 * shape * weather
     p_ac = p_dc * (1.0 - losses)
 
-    # ✅ 用 numpy 计算小时，避免 pandas Index 带来的原地赋值问题
+   
     hours = index_local.hour.to_numpy() + index_local.minute.to_numpy() / 60.0
 
-    # ✅ 不做原地赋值，改用 np.where
+  
     night_mask = (hours < 5.5) | (hours > 21.5)
     p_ac = np.where(night_mask, 0.0, p_ac)
 
@@ -165,28 +165,3 @@ def solcast(position_latitude: float, position_longitude: float, position_altitu
                                 capacity_kwp=capacity_kwp, losses=losses).to_frame()
         return _ensure_output(df)
 
-def main():
-        # 调用 solcast，返回一个 DataFrame
-        df = solcast(
-            position_latitude=50.63,
-            position_longitude=3.06,
-            position_altitude=20,
-            position_timezone="Europe/Paris",
-            horizon=48,  # 预测 48 小时
-            pas_de_temps=60,  # 时间步长 60 分钟
-            azimuth=180,  # 朝南
-            tilt=30,  # 倾角 30°
-            capacity_kwp=6.0,  # 模拟 6 kWp 的光伏系统
-            simulate=True  # ⚠️ 默认 True = 模拟，不会去请求真实 API
-        )
-
-        # 查看前几行数据
-        print(df.head())
-
-        # 导出到 CSV
-        output_file = "solcast_forecast.csv"
-        df.to_csv(output_file)
-        print(f"结果已导出到 {output_file}")
-
-if __name__ == "__main__":
-        main()
