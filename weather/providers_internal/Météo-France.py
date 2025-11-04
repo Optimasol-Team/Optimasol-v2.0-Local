@@ -119,31 +119,3 @@ def meteo_france_via_open_meteo(latitude: float, longitude: float, altitude: flo
 
 
 
-def main():
-    # 1. 调用函数（你给的示例完全OK）
-    df = meteo_france_via_open_meteo(
-        latitude=50.63, longitude=3.06, altitude=20,
-        timezone="Europe/Paris",
-        horizon=72,           # 未来72小时
-        pas_de_temps=60       # 步长60分钟
-    )
-
-    # 2. 看一眼数据
-    print("DataFrame shape:", df.shape)
-    print(df.head(10))       # 打印前10行
-
-    # 3. 导出到CSV（最常用）
-    out_csv = "open_meteo_forecast.csv"
-    df.to_csv(out_csv)
-    print(f"CSV 已导出：{out_csv}")
-
-    # 4. 如果你喜欢 parquet（更快更省空间，分析方便）
-    # pip install pyarrow
-    # df.to_parquet("open_meteo_forecast.parquet")
-
-    # 5. 若你有后续计算/可视化，直接对 df 做处理即可
-    # 例如：只看白天的样本
-    # df_day = df.between_time("06:00", "20:00")
-
-if __name__ == "__main__":
-    main()
