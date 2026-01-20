@@ -1,0 +1,32 @@
+I) Au démarrage : 
+
+1) Démrrage du projet. 
+2) Tirer le path de la BDD depuis config/path_to_db.json 
+3) Utiliser les programmes database/ et initialiser la DB. 
+4) Instancier AllClient à partir de la base de données. la fonction à utiliser get_all_clients_engine 
+5) Il faut parcourir AllClient. Pour chaque client, il faut activer le driver. 
+Ceci démarre l'écoute et la mise à jour continue des paramètres internes du client. 
+
+III) Les tâches périodiques : 
+1) Exécution du process : 
+Répartir les clients de allclients ensuite. 
+Pour chaque client lancer client.process(). 
+Tout les clients doivent passer sur un pas. 
+
+2) Mise à jour de la météo : 
+Mise à jour de la météo centrale (allclients.update_forecasts() ensuite pour chaque client lancer all_clients.update_productions). 
+La fréquence de ça est tirée de config/update_weather.json 
+A chaque mise à jour, on tire pour chaque client, la production (dans le DF) la plus proche de datetime.now(). 
+On reporte cette production via la fonction du DBManager : report_production_forecast. 
+
+3) Mise à jour BDD <-> all_clients : 
+Cela se fait à une fréquence de update_with_db.json. (en minutes). 
+
+4) Mise à jour du rendement : 
+Le rendement à mettre à jour se trouve dans : client.client_weather.installation_PV.rendement_global. 
+Cela doit se faire avec la fréquence indiquée dans check_efficiency_pannels?json. 
+Pour chaque client il faut tirer la production mesurée / production_dorecast (avec les méthodes de la DB)
+Ensuite, il faut utiliser le coefficient de correction calculée par weather_amanger. 
+Ce coefficient doit être multiplié par le rendement global. 
+
+

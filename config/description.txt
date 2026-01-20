@@ -1,0 +1,8 @@
+Ce dossier config contient les configurations nécessaires du projet Optimasol. 
+
+- check_efficiency_pannels.json : Une fréquence de mise à jour du rendement des pannels (jours)
+- min_distance.json : la distance minimale utilisée dans le core lors de l'ajout des clients. (km)
+- optimizer_config.json : contient les données d'horizon / pas utilisé dans le moeur d'optimisation. (horizon en heures, pas en monites)
+- path_to_db.json : Le chemin vers la BDD centrale du projet. (chemin en str)
+- update_weather.json : Fréquence des mise à jour des données météo. (heures)  
+- update_with_db.json : Fréqence de mise à jour BDD avec Données internes logiciel (all_clients) (en minutes)

@@ -1,0 +1,60 @@
+I) Gestion du Service (Le Moteur 24h/24) :
+
+1) optimasol start
+   Lance le programme principal (main.py) en arrière-plan.
+   Crée le fichier PID et redirige les logs vers service.log.
+
+2) optimasol stop
+   Arrête proprement le service en cours d'exécution.
+   Attend la fin des écritures en base de données avant de couper.
+
+3) optimasol restart
+   Coupe puis relance le service.
+   À utiliser après une modification de configuration ou une mise à jour.
+
+4) optimasol status
+   Affiche un bilan de santé immédiat :
+   - État du processus (Actif/Inactif).
+   - État de la connexion BDD.
+   - Nombre de clients chargés en mémoire.
+
+5) optimasol logs
+   Affiche les logs en direct (équivalent de tail -f).
+   Permet de voir ce qui se passe en temps réel.
+
+
+II) Maintenance et Mises à jour :
+
+6) optimasol update
+   Récupère la dernière version du code depuis GitHub (git pull).
+   Affiche les changements effectués.
+
+7) optimasol db backup
+   Crée une copie de sécurité immédiate de la base de données.
+   Le fichier est sauvegardé dans un dossier backups/ avec la date.
+
+
+III) Gestion des Clients (Mode Administrateur) :
+
+8) optimasol client ls
+   Affiche la liste de tous les clients sous forme de tableau.
+   Colonnes : ID, Nom, Type de Driver, Statut.
+
+9) optimasol client create
+   Lance l'assistant interactif pour ajouter un nouveau client.
+   Demande : Nom, Email, Mot de passe, Driver et Numéro de Série.
+
+10) optimasol client rm <CLIENT_ID>
+    Supprime définitivement un client et tout son historique de mesures.
+    Demande une confirmation de sécurité avant d'agir.
+
+11) optimasol client show <CLIENT_ID>
+    Affiche la configuration technique complète (JSON) d'un client.
+    Utile pour le débogage.
+
+
+IV) Provisioning (Installation chez le client) :
+
+12) optimasol key gen <CLIENT_ID>
+    Génère une clé d'activation courte (ex: OPT-A1B2) liée à ce client.
+    Cette clé permet au boîtier physique de s'associer au compte lors de son premier allumage.
