@@ -1,5 +1,11 @@
-import time # Nécessaire pour faire une pause
-from drivers import SmartEMDriver 
+import time  # Nécessaire pour faire une pause
+from pathlib import Path
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT / "src"))
+
+from optimasol.drivers import SmartEMDriver 
 
 # Instanciation
 # On doit utiliser la clé définie dans le form_schema ("key": "serial_number")

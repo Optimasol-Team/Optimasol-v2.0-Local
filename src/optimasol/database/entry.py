@@ -6,11 +6,13 @@ from pathlib import Path
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from ..paths import DEFAULT_DB_PATH, ensure_runtime_dirs
+
 # Imports du projet
-from core import AllClients
-from core.client_model import Client
+from ..core import AllClients
+from ..core.client_model import Client
 # Import des drivers pour la Factory
-from drivers import ALL_DRIVERS 
+from ..drivers import ALL_DRIVERS
 # Imports des modules métier (Engine et Weather)
 # On utilise des imports relatifs (..) car optimiser_engine est au même niveau que database
 from optimiser_engine import Client as Clt_engine
@@ -20,11 +22,12 @@ class DBManager:
     def __init__(self, path_db: Path = None):
         if path_db is None:
             # Par défaut : dossier data/ à la racine du projet
-            self._path = Path(__file__).parent.parent / "data" / "optimasol.db"
+            self._path = DEFAULT_DB_PATH
         else:
             self._path = path_db
             
         # Création du dossier si inexistant
+        ensure_runtime_dirs()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         
         # Initialisation du schéma

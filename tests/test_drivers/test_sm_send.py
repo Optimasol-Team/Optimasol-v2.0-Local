@@ -1,5 +1,11 @@
-import time 
-from drivers import SmartEMDriver 
+import time
+from pathlib import Path
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT / "src"))
+
+from optimasol.drivers import SmartEMDriver 
 
 # Attention : Sur votre téléphone, assurez-vous de souscrire au topic "pv1/#" 
 # et non "PVROUTER001/#" puisque vous avez changé le numéro de série ici !

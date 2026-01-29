@@ -1,0 +1,2 @@
+[console_scripts]
+optimasol = optimasol.cli:main

@@ -9,19 +9,18 @@ from typing import Callable, Optional
 
 import pandas as pd
 
-from core.client_model import Client
-from database import DBManager
+from .core.client_model import Client
+from .database import DBManager
+from .paths import CONFIG_DIR, LOG_FILE, RUNTIME_ROOT, ensure_runtime_dirs
 from weather_manager.evaluation import ForecastEvaluator
 
 
 # Dossiers et constantes de configuration
-CONFIG_DIR = Path(__file__).parent / "config"
 WEATHER_CONFIG = CONFIG_DIR / "update_weather.json"
 DB_SYNC_CONFIG = CONFIG_DIR / "update_with_db.json"
 EFFICIENCY_CONFIG_PRIMARY = CONFIG_DIR / "chack_efficiency_pannels.json"
 EFFICIENCY_CONFIG_FALLBACK = CONFIG_DIR / "check_efficiency_pannels.json"
 DB_PATH_CONFIG = CONFIG_DIR / "path_to_db.json"
-LOG_FILE = Path(__file__).with_name("service.log")
 
 logger = logging.getLogger("optimasol.main")
 
@@ -66,6 +65,7 @@ def _configure_logging() -> logging.Logger:
     if getattr(_configure_logging, "_configured", False):
         return logger
 
+    ensure_runtime_dirs()
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(threadName)s | %(name)s | %(message)s",
@@ -139,7 +139,7 @@ def _load_db_path() -> Optional[Path]:
             return None
         db_path = Path(raw).expanduser()
         if not db_path.is_absolute():
-            db_path = (CONFIG_DIR.parent / raw).resolve()
+            db_path = (RUNTIME_ROOT / raw).resolve()
         return db_path
     except Exception as exc:
         logger.warning(

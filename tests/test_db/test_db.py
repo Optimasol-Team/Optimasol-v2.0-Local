@@ -1,15 +1,15 @@
 from pathlib import Path
 import sys
 
-# Ajout de la racine du projet au path pour les imports
-BASE_DIR = Path(__file__).parent.parent 
-sys.path.append(str(BASE_DIR))
+# Ajout de src/ au path pour les imports
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT / "src"))
 
-from database import DBManager 
+from optimasol.database import DBManager
 
 # 1. Setup
 # On utilise une DB de test pour ne pas casser la vraie
-to_db = BASE_DIR / "data" / "test_optimasol.db" 
+to_db = Path(__file__).parent.parent / "data" / "test_optimasol.db"
 
 # Nettoyage préalable (pour repartir de zéro à chaque test)
 if to_db.exists():

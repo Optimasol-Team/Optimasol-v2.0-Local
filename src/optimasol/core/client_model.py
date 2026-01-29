@@ -1,16 +1,15 @@
-from optimiser_engine import Client as Clt_engine 
-from weather_manager import Client as Clt_weather 
-from drivers import BaseDriver 
-from datetime import datetime, timezone 
+from optimiser_engine import Client as Clt_engine
+from weather_manager import Client as Clt_weather
+from ..drivers import BaseDriver
+from datetime import datetime, timezone
 from optimiser_engine import OptimizerService
-from pathlib import Path 
-import json 
+import json
+from ..paths import CONFIG_DIR
 
 class Client:
     @staticmethod
     def load_config_optimisation() :
-        BASE_DIR = Path(__file__).parent.parent 
-        DIR_CONFIG = BASE_DIR / "config" / "optimizer_config.json"
+        DIR_CONFIG = CONFIG_DIR / "optimizer_config.json"
         try:
             with open(DIR_CONFIG, 'r') as f:
                 config = json.load(f)

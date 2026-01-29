@@ -1,16 +1,15 @@
 from .client_model import Client
-from pathlib import Path 
-import math 
-import pandas as pd 
+import math
+import pandas as pd
 from weather_manager import get_forecast_for_client, Converter
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
+from ..paths import CONFIG_DIR
 class ClientAlreadyExists(Exception) :
     pass 
 
 class AllClients :
     """Contient les informations sur touts les clients"""
-    BASE_DIR = Path(__file__).parent.parent 
-    DIR_CONFIG = BASE_DIR / "config" / "min_distance_weather.json" 
+    DIR_CONFIG = CONFIG_DIR / "min_distance.json"
     @staticmethod 
     def load_min_distance_config() :
         import json 

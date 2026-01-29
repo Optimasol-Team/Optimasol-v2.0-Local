@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "optimasol"
+version = "0.1.0"
+description = "Service Optimasol (service 24/24 + CLI administrateur)."
+requires-python = ">=3.9"
+authors = [{ name = "Optimasol" }]
+dependencies = [
+  "pandas",
+  "paho-mqtt",
+  "Werkzeug",
+]
+
+[project.scripts]
+optimasol = "optimasol.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["optimasol*"]
+
+[tool.setuptools.package-data]
+"optimasol" = [
+  "config/*.json",
+  "config/*.txt",
+  "data/*.db",
+  "database/schema.sql",
+  "drivers/router_smart_electromation/*.json",
+  "drivers/router_smart_electromation/assets/*",
+]

@@ -1,0 +1,14 @@
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Journalisation initialisée (fichier=/Users/anaselb/Dev/Optimasol-v2.0-local/service.log).
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Journalisation initialisée (fichier=/Users/anaselb/Dev/Optimasol-v2.0-local/service.log).
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Demarrage du service Optimasol.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Demarrage du service Optimasol.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | BDD initialisee (path=/Users/anaselb/Dev/Optimasol-v2.0-local/data/optimasol.db)
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | BDD initialisee (path=/Users/anaselb/Dev/Optimasol-v2.0-local/data/optimasol.db)
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Clients charges: 0
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Clients charges: 0
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Drivers demarres.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Drivers demarres.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Premiere mise a jour meteo effectuee.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Premiere mise a jour meteo effectuee.
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Taches periodiques lancees (process=900.0s, meteo=3600.0s, bdd=120.0s, rendement=604800.0s).
+2026-01-20 15:48:26 | INFO | MainThread | optimasol.main | Taches periodiques lancees (process=900.0s, meteo=3600.0s, bdd=120.0s, rendement=604800.0s).

@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: optimasol
+Version: 0.1.0
+Summary: Service Optimasol (service 24/24 + CLI administrateur).
+Author: Optimasol
+Requires-Python: >=3.9
+Requires-Dist: pandas
+Requires-Dist: paho-mqtt
+Requires-Dist: Werkzeug
