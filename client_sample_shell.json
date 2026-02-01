@@ -1,0 +1,70 @@
+{
+  "id": 1,
+
+  "engine": {
+    "client_id": 1,
+    "water_heater": {
+      "volume": 200,
+      "power": 2400,
+      "insulation_coeff": 0.8,
+      "temp_cold_water": 15
+    },
+    "prices": {
+      "mode": "BASE",
+      "base_price": 0.18,
+      "resell_price": 0.06
+    },
+    "features": {
+      "gradation": true,
+      "mode": "cost"
+    },
+    "constraints": {
+      "min_temp": 45,
+      "forbidden_slots": [
+        { "start": "06:30", "end": "07:30" },
+        { "start": "18:00", "end": "19:00" }
+      ],
+      "background_noise": 250.0
+    },
+    "planning": [
+      { "day": 0, "time": "05:30", "target_temp": 50, "volume": 40 },
+      { "day": 0, "time": "20:30", "target_temp": 52, "volume": 30 },
+      { "day": 3, "time": "05:30", "target_temp": 50, "volume": 40 },
+      { "day": 3, "time": "20:30", "target_temp": 52, "volume": 30 },
+      { "day": 5, "time": "08:00", "target_temp": 55, "volume": 50 }
+    ]
+  },
+
+  "weather": {
+    "client_id": 1,
+    "position": {
+      "latitude": 43.6,
+      "longitude": 1.44,
+      "altitude": 150
+    },
+    "installation": {
+      "rendement_global": 0.18,
+      "liste_panneaux": [
+        {
+          "azimuth": 180,
+          "tilt": 30,
+          "surface_panneau": 1.8,
+          "puissance_nominale": 350
+        },
+        {
+          "azimuth": 190,
+          "tilt": 25,
+          "surface_panneau": 1.9,
+          "puissance_nominale": 360
+        }
+      ]
+    }
+  },
+
+  "driver": {
+    "type": "smart_electromation_mqtt",
+    "config": {
+      "serial_number": "PVROUTER001"
+    }
+  }
+}

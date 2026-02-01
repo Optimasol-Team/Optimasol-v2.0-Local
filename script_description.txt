@@ -3,7 +3,7 @@ I) Au démarrage :
 1) Démrrage du projet. 
 2) Tirer le path de la BDD depuis config/path_to_db.json 
 3) Utiliser les programmes database/ et initialiser la DB. 
-4) Instancier AllClient à partir de la base de données. la fonction à utiliser get_all_clients_engine 
+4) Instancier AllClient à partir de la base de données. la fonction à utiliser get_all_clients
 5) Il faut parcourir AllClient. Pour chaque client, il faut activer le driver. 
 Ceci démarre l'écoute et la mise à jour continue des paramètres internes du client. 
 

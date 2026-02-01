@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Optimasol</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Optimasol</h1>
+      <div id="user-info"></div>
+    </header>
+
+    <main>
+      <section id="auth-section">
+        <div class="card">
+          <h2>Connexion</h2>
+          <form id="login-form">
+            <input type="email" name="email" placeholder="Email" required />
+            <input type="password" name="password" placeholder="Mot de passe" required />
+            <button type="submit">Se connecter</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Inscription (clé requise)</h2>
+          <form id="signup-form">
+            <input type="text" name="activation_key" placeholder="Clé d'accès" required />
+            <input type="text" name="name" placeholder="Nom" required />
+            <input type="email" name="email" placeholder="Email" required />
+            <input type="password" name="password" placeholder="Mot de passe" required />
+            <textarea name="client_json" placeholder='Collez ici le JSON client' rows="12" required></textarea>
+            <button type="submit">Créer le compte</button>
+          </form>
+          <p class="hint">Exemple disponible dans <code>client_sample_shell.json</code></p>
+        </div>
+      </section>
+
+      <section id="dashboard" class="hidden">
+        <div class="card">
+          <h2>Tableau de bord</h2>
+          <div id="summary"></div>
+        </div>
+
+        <div class="card">
+          <h2>Mon client</h2>
+          <textarea id="client-editor" rows="16"></textarea>
+          <button id="save-client">Sauvegarder</button>
+          <div id="save-status"></div>
+        </div>
+
+        <div class="card">
+          <h2>Historique</h2>
+          <div id="history"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

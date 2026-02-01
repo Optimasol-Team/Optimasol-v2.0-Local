@@ -1,345 +1,127 @@
-import json
-import logging
-import sys
-import threading
+from __future__ import annotations
+
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Optional
+import logging
 
-import pandas as pd
+from .core import AllClients
+from .default import DEFAULT_DB_PATH, PROJECT_ROOT, ensure_runtime_dirs, resolve_config
+from .logging_setup import setup_logging
 
-from .core.client_model import Client
-from .database import DBManager
-from .paths import CONFIG_DIR, LOG_FILE, RUNTIME_ROOT, ensure_runtime_dirs
-from weather_manager.evaluation import ForecastEvaluator
-
-
-# Dossiers et constantes de configuration
-WEATHER_CONFIG = CONFIG_DIR / "update_weather.json"
-DB_SYNC_CONFIG = CONFIG_DIR / "update_with_db.json"
-EFFICIENCY_CONFIG_PRIMARY = CONFIG_DIR / "chack_efficiency_pannels.json"
-EFFICIENCY_CONFIG_FALLBACK = CONFIG_DIR / "check_efficiency_pannels.json"
-DB_PATH_CONFIG = CONFIG_DIR / "path_to_db.json"
-
-logger = logging.getLogger("optimasol.main")
+# Emplacement de secours si la base configurée n'est pas accessible.
+FALLBACK_DB_PATH = PROJECT_ROOT / "fallback_optimasol.db"
 
 
-class _LoggerWriter:
-    """Redirects stdout/stderr to the logging system."""
-
-    def __init__(self, log_function: Callable[[str], None]):
-        self.log_function = log_function
-        self._buffer = ""
-        self.encoding = "utf-8"
-
-    def write(self, message: str) -> None:
-        if not message:
-            return
-        self._buffer += message
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            line = line.rstrip("\r")
-            if line:
-                self.log_function(line)
-
-    def flush(self) -> None:
-        if self._buffer:
-            line = self._buffer.rstrip("\r\n")
-            if line:
-                self.log_function(line)
-            self._buffer = ""
-
-    def isatty(self) -> bool:
-        return False
-
-    def writable(self) -> bool:
-        return True
-
-    def writelines(self, lines) -> None:
-        for line in lines:
-            self.write(line)
+def _coerce_db_path(raw_path: str) -> Path:
+    """Transforme un chemin éventuellement relatif en chemin absolu."""
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = (PROJECT_ROOT / raw_path).resolve()
+    return candidate
 
 
-def _configure_logging() -> logging.Logger:
-    if getattr(_configure_logging, "_configured", False):
-        return logger
-
+def _resolve_db_path(config: dict) -> Path:
+    """Choisit le chemin de BDD à partir du contexte courant ou du défaut."""
     ensure_runtime_dirs()
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(threadName)s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
-    file_handler.setFormatter(formatter)
-
-    console_handler = logging.StreamHandler(sys.__stdout__)
-    console_handler.setFormatter(formatter)
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.handlers.clear()
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(console_handler)
-
-    logging.captureWarnings(True)
-
-    sys.stdout = _LoggerWriter(root_logger.info)
-    sys.stderr = _LoggerWriter(root_logger.error)
-
-    def _handle_exception(exc_type, exc_value, exc_traceback):
-        if issubclass(exc_type, KeyboardInterrupt):
-            root_logger.info("Interruption clavier détectée, arrêt demandé.")
-            return
-        root_logger.error(
-            "Exception non gérée",
-            exc_info=(exc_type, exc_value, exc_traceback),
-        )
-
-    def _handle_thread_exception(args):
-        if issubclass(args.exc_type, KeyboardInterrupt):
-            return
-        root_logger.error(
-            "Exception non gérée dans le thread %s",
-            args.thread.name,
-            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
-        )
-
-    sys.excepthook = _handle_exception
-    threading.excepthook = _handle_thread_exception
-
-    _configure_logging._configured = True
-    logger.info("Journalisation initialisée (fichier=%s).", LOG_FILE)
-    return logger
-
-
-def _load_config_value(path: Path, key: str, default: float) -> float:
+    path_cfg = config.get("path_to_db", {})
+    raw_path = path_cfg.get("path_to_db") if isinstance(path_cfg, dict) else None
+    if not raw_path:
+        return DEFAULT_DB_PATH
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        value = data.get(key, default)
-        if isinstance(value, (int, float)) and value > 0:
-            return float(value)
-    except Exception as exc:
-        logger.warning("[Config] Lecture impossible pour %s: %s", path.name, exc)
-    return float(default)
-
-
-def _load_interval_seconds(path: Path, key: str, default: float, unit_seconds: float) -> float:
-    return _load_config_value(path, key, default) * unit_seconds
-
-
-def _load_db_path() -> Optional[Path]:
-    try:
-        with open(DB_PATH_CONFIG, "r", encoding="utf-8") as f:
-            raw = json.load(f).get("path_to_db")
-        if not raw or not isinstance(raw, str) or raw.strip() == "" or "..." in raw:
-            return None
-        db_path = Path(raw).expanduser()
-        if not db_path.is_absolute():
-            db_path = (RUNTIME_ROOT / raw).resolve()
-        return db_path
-    except Exception as exc:
-        logger.warning(
-            "[Config] Impossible de charger le chemin BDD (%s), utilisation du chemin par defaut.",
-            exc,
-        )
-        return None
-
-
-def _spawn_periodic_task(
-    name: str,
-    interval_seconds: float,
-    stopper: threading.Event,
-    func: Callable[[], None],
-) -> threading.Thread:
-    def _runner():
-        while not stopper.is_set():
-            start = time.monotonic()
-            try:
-                func()
-            except Exception as exc:
-                logger.exception("[%s] Erreur: %s", name, exc)
-            elapsed = time.monotonic() - start
-            wait_time = max(interval_seconds - elapsed, 0)
-            stopper.wait(wait_time)
-
-    thread = threading.Thread(target=_runner, name=name, daemon=True)
-    thread.start()
-    return thread
-
-
-def _start_drivers(all_clients):
-    for client in all_clients.list_of_clients:
-        try:
-            client.driver.start()
-        except Exception as exc:
-            logger.exception(
-                "[Startup] Echec demarrage driver pour client %s: %s",
-                client.client_id,
-                exc,
-            )
-
-
-def _nearest_forecast_point(df: pd.DataFrame) -> Optional[tuple[datetime, float]]:
-    if df is None or df.empty or "production" not in df.columns or "Datetime" not in df.columns:
-        return None
-    try:
-        timestamps = pd.to_datetime(df["Datetime"], utc=True)
+        return _coerce_db_path(str(raw_path))
     except Exception:
-        return None
-
-    working_df = df.copy()
-    working_df["_dt"] = timestamps
-    ref_time = pd.Timestamp.now(tz=timezone.utc)
-    working_df["_diff"] = (working_df["_dt"] - ref_time).abs()
-    nearest_idx = working_df["_diff"].idxmin()
-    nearest_row = working_df.loc[nearest_idx]
-    return nearest_row["_dt"].to_pydatetime(), float(nearest_row["production"])
+        return DEFAULT_DB_PATH
 
 
-def _push_latest_forecasts(all_clients, db_manager: DBManager):
-    for client in all_clients.list_of_clients:
-        point = _nearest_forecast_point(getattr(client, "production_forecast", None))
-        if point is None:
-            continue
-        ts, production = point
-        try:
-            db_manager.report_production_forecast(client.client_id, production, ts)
-        except Exception as exc:
-            logger.exception(
-                "[Meteo] Echec enregistrement forecast pour %s: %s",
-                client.client_id,
-                exc,
-            )
+def _build_db_manager(path_db: Path):
+    """Instancie DBManager avec repli automatique sur la BDD de secours."""
+    from .database import DBManager
 
-
-def _process_clients(all_clients):
-    for client in all_clients.list_of_clients:
-        try:
-            client.process()
-        except Exception as exc:
-            logger.exception("[Process] Echec pour le client %s: %s", client.client_id, exc)
-
-
-def _sync_db(all_clients, db_manager: DBManager):
     try:
-        db_manager.update_db_service(all_clients)
-    except Exception as exc:
-        logger.exception("[BDD] Sync echec: %s", exc)
+        return DBManager(path_db), path_db
+    except Exception:
+        fallback = FALLBACK_DB_PATH
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        return DBManager(fallback), fallback
 
 
-def _refresh_weather(all_clients, db_manager: DBManager):
-    try:
-        all_clients.update_weather()
-        _push_latest_forecasts(all_clients, db_manager)
-    except Exception as exc:
-        logger.exception("[Meteo] Mise a jour echec: %s", exc)
+def _apply_runtime_config(config: dict):
+    """Propagate configuration to dependent modules that expect static values."""
+    from .core import Client
+    from .drivers import SmartEMDriver
+
+    optimizer_cfg = config["optimizer_config"]
+    Client.CONFIG_OPTIMISATION = optimizer_cfg
+    Client.HORIZON_HOURS = int(optimizer_cfg["horizon"])
+    Client.STEP_MINUTES = int(optimizer_cfg["step_minutes"])
+
+    AllClients.MINIMAL_DISTANCE = float(config["min_distance"]["minimal_distance"])
+
+    SmartEMDriver.CONFIG_MQTT = {
+        "host": config["mqtt_config"]["host"],
+        "port": int(config["mqtt_config"]["port"]),
+    }
 
 
-def _prepare_df_from_db(df: pd.DataFrame) -> pd.DataFrame:
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["Datetime", "production"])
-    prepared = df.rename(columns={"timestamp": "Datetime"})
-    if "Datetime" not in prepared.columns or "production" not in prepared.columns:
-        return pd.DataFrame(columns=["Datetime", "production"])
-    prepared = prepared[["Datetime", "production"]].copy()
-    prepared["Datetime"] = pd.to_datetime(prepared["Datetime"], utc=True)
-    return prepared
+def main(config: dict) -> None:
+    """Entry point. Expects a configuration dictionary already loaded from JSON."""
+    setup_logging()
+    resolved_config = resolve_config(config)
+    logger = logging.getLogger(__name__)
+    logger.info("Configuration chargée et normalisée")
 
+    from .core import AllClients, Client
+    from .tasks import correct_efficiency, reports_data, update_weather
 
-def _get_installation(client) -> Optional[object]:
-    weather_obj = getattr(client, "client_weather", None)
-    if weather_obj is None:
-        return None
-    return getattr(weather_obj, "installation", getattr(weather_obj, "installation_PV", None))
+    _apply_runtime_config(resolved_config)
 
+    path_db = _resolve_db_path(resolved_config)
+    db_manager, path_db = _build_db_manager(path_db)
+    logger.info("Base de données initialisée à %s", path_db)
 
-def _update_efficiency(all_clients, db_manager: DBManager):
+    all_clients = db_manager.client_manager.get_all_clients()
+    logger.info("Clients chargés: %d", len(all_clients.list_of_clients))
+
     for client in all_clients.list_of_clients:
-        df_measured = _prepare_df_from_db(db_manager.get_productions_measured(client.client_id))
-        df_forecasts = _prepare_df_from_db(db_manager.get_productions_forecasts(client.client_id))
-        if df_measured.empty or df_forecasts.empty:
-            continue
-        try:
-            evaluator = ForecastEvaluator(df_forecasts, df_measured)
-            coefficient = evaluator.correction_coefficient()
-        except Exception as exc:
-            logger.exception("[Rendement] Evaluation impossible pour %s: %s", client.client_id, exc)
-            continue
-        if coefficient <= 0:
-            continue
+        client.driver.start()
+    logger.info("Drivers lancés pour tous les clients")
 
-        installation = _get_installation(client)
-        if installation is None or installation.rendement_global is None:
-            continue
+    freq_weather_s = resolved_config["update_weather"]["frequency"] * 3600
+    freq_sync_db_s = resolved_config["update_with_db"]["frequency"] * 60
+    freq_eff_s = resolved_config["chack_efficiency_pannels"]["frequency"] * 24 * 3600
+    step_process_s = Client.STEP_MINUTES * 60
 
-        new_rendement = installation.rendement_global * coefficient
-        new_rendement = max(min(new_rendement, 1.0), 1e-6)
-        try:
-            installation.rendement_global = new_rendement
-            db_manager.update_table_client_ui(client)
-        except Exception as exc:
-            logger.exception("[Rendement] Mise a jour impossible pour %s: %s", client.client_id, exc)
+    now = datetime.now(timezone.utc)
+    next_process = now
+    next_weather = now
+    next_sync_db = now
+    next_efficiency = now
 
+    logger.info("Boucle principale démarrée (tâches périodiques)")
+    while True:
+        now = datetime.now(timezone.utc)
 
-def main():
-    _configure_logging()
-    logger.info("Demarrage du service Optimasol.")
+        if now >= next_process:
+            for client in all_clients.list_of_clients:
+                client.process()
+            next_process = now + timedelta(seconds=step_process_s)
+            logger.info("Traitement optimisation effectué pour tous les clients")
 
-    db_path = _load_db_path()
-    db_manager = DBManager(db_path)
-    logger.info("BDD initialisee (path=%s)", db_manager.path)
-    all_clients = db_manager.get_all_clients_engine()
-    logger.info("Clients charges: %s", len(all_clients.list_of_clients))
+        if now >= next_weather:
+            update_weather(all_clients, db_manager)
+            next_weather = now + timedelta(seconds=freq_weather_s)
+            logger.info("Mise à jour météo déclenchée")
 
-    _start_drivers(all_clients)
-    logger.info("Drivers demarres.")
+        if now >= next_sync_db:
+            reports_data(all_clients, db_manager)
+            db_manager.update_db_service(all_clients)
+            next_sync_db = now + timedelta(seconds=freq_sync_db_s)
+            logger.info("Synchronisation BDD terminée")
 
-    # Initialisation des premieres donnees meteo pour debloquer le process()
-    _refresh_weather(all_clients, db_manager)
-    logger.info("Premiere mise a jour meteo effectuee.")
+        if now >= next_efficiency:
+            correct_efficiency(all_clients, db_manager)
+            next_efficiency = now + timedelta(seconds=freq_eff_s)
+            logger.info("Correction de rendement effectuée")
 
-    # Chargement des frequences
-    weather_interval = _load_interval_seconds(WEATHER_CONFIG, "frequency", 1, 3600)
-    db_sync_interval = _load_interval_seconds(DB_SYNC_CONFIG, "frequency", 2, 60)
-    efficiency_file = EFFICIENCY_CONFIG_PRIMARY if EFFICIENCY_CONFIG_PRIMARY.exists() else EFFICIENCY_CONFIG_FALLBACK
-    efficiency_interval = _load_interval_seconds(efficiency_file, "frequency", 7, 24 * 3600)
-    process_interval = max(float(Client.STEP_MINUTES) * 60, 1.0)
-
-    stopper = threading.Event()
-    threads: list[threading.Thread] = []
-    try:
-        threads = [
-            _spawn_periodic_task("ProcessClients", process_interval, stopper, lambda: _process_clients(all_clients)),
-            _spawn_periodic_task("WeatherUpdater", weather_interval, stopper, lambda: _refresh_weather(all_clients, db_manager)),
-            _spawn_periodic_task("DBSync", db_sync_interval, stopper, lambda: _sync_db(all_clients, db_manager)),
-            _spawn_periodic_task("EfficiencyUpdater", efficiency_interval, stopper, lambda: _update_efficiency(all_clients, db_manager)),
-        ]
-        logger.info(
-            "Taches periodiques lancees (process=%.1fs, meteo=%.1fs, bdd=%.1fs, rendement=%.1fs).",
-            process_interval,
-            weather_interval,
-            db_sync_interval,
-            efficiency_interval,
-        )
-        while not stopper.is_set():
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Interruption clavier recue, fermeture en cours.")
-    except Exception as exc:
-        logger.exception("Erreur critique dans main(): %s", exc)
-    finally:
-        stopper.set()
-        for thread in threads:
-            try:
-                thread.join(timeout=5)
-            except Exception as join_exc:
-                logger.exception("Erreur lors de l'arret du thread %s: %s", thread.name, join_exc)
-        logger.info("Service arrete proprement.")
-
-
-if __name__ == "__main__":
-    main()
+        time.sleep(1)

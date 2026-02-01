@@ -16,6 +16,8 @@ dependencies = [
 
 [project.scripts]
 optimasol = "optimasol.cli:main"
+optimasol-service = "optimasol.service_runner:run"
+optimasol-web = "web.server:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

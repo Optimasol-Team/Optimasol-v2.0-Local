@@ -1,89 +1,126 @@
--- database/schema.sql
-
--- 1. Configuration du moteur SQLite
--- Active le mode WAL pour permettre la lecture (UI) et l'écriture (Service 24h) simultanées
-PRAGMA journal_mode=WAL;
--- Active la vérification des clés étrangères (Foreign Keys)
+-- schema.sql (SQLite)
 PRAGMA foreign_keys = ON;
 
 
--- 2. Table UTILISATEURS / CLIENTS
--- Cette table centralise tout : config technique, driver, et accès UI.
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,          -- UUID généré ou ID unique
-    
-    -- Identification & UI
-    name TEXT,                    -- Nom affiché (ex: "Maison Anas")
-    email TEXT UNIQUE,            -- Email pour login (Unique pour éviter doublons)
-    hash TEXT,                    -- Hash du mot de passe (Werkzeug)
-    
-    -- Configurations Métier (Stockées en JSON pour flexibilité)
-    config_engine TEXT,           -- Paramètres du ballon/résistance (JSON)
-    config_weather TEXT,          -- Paramètres géo/toiture (JSON)
-    config_ui TEXT,               -- Préférences d'affichage (JSON)
-    config_driver TEXT,           -- Paramètres de connexion driver (IP, Serial...) (JSON)
-    
-    -- Liens techniques
-    driver_id TEXT,               -- ID du type de driver (ex: "smart_electromation_mqtt")
-    weather_ref TEXT              -- ID du client "Leader" météo (ou lui-même)
+
+-- ========== Drivers ==========
+CREATE TABLE IF NOT EXISTS Drivers (
+    driver_id   INTEGER PRIMARY KEY,
+    nom_driver  TEXT
 );
 
+-- ========== users_main ==========
+CREATE TABLE IF NOT EXISTS users_main (
+    id             INTEGER PRIMARY KEY,
+    weather_ref    INTEGER,   -- référence vers le "chef" météo (un autre client)
+    config_engine  TEXT,   -- YAML (texte)
+    config_weather TEXT,   -- YAML (texte)
+    driver_id      INTEGER,
+    config_driver  TEXT,   -- YAML (texte)
+    Auto_correction INTEGER DEFAULT 0, -- Booléen (0/1) indiquant si la correction automatique est active
 
--- 3. Tables de MESURES (Données chaudes / Historique)
--- Séparées pour la performance des graphiques.
+    FOREIGN KEY (weather_ref) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL,
 
--- Historique des températures mesurées par le driver
+    FOREIGN KEY (driver_id) REFERENCES Drivers(driver_id)
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+);
+
+-- ========== Decisions ==========
+CREATE TABLE IF NOT EXISTS Decisions (
+    id        INTEGER NOT NULL,
+    timestamp TEXT NOT NULL,   -- date (texte)
+    decision  REAL,            -- PUISSANCE APPLIQUÉE (FLOAT)
+
+    PRIMARY KEY (id, timestamp),
+    FOREIGN KEY (id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+-- ========== Productions ==========
+CREATE TABLE IF NOT EXISTS Productions (
+    id         INTEGER NOT NULL,
+    timestamp  TEXT NOT NULL,  -- date/heure (UTC) (texte)
+    production REAL,           -- production prévue
+
+    PRIMARY KEY (id, timestamp),
+    FOREIGN KEY (id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);
+
+-- ========== temperatures ==========
 CREATE TABLE IF NOT EXISTS temperatures (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL,
-    temperature REAL,
-    timestamp TEXT NOT NULL,      -- Format ISO8601 (YYYY-MM-DDTHH:MM:SS)
-    FOREIGN KEY(client_id) REFERENCES users(id) ON DELETE CASCADE
+    id          INTEGER NOT NULL,
+    temperature REAL,          -- température mesurée
+    timestamp   TEXT NOT NULL, -- date/heure (UTC) (texte)
+
+    PRIMARY KEY (id, timestamp),
+    FOREIGN KEY (id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
--- Historique de la production solaire mesurée par le driver
-CREATE TABLE IF NOT EXISTS productions_measures (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL,
-    production REAL,
-    timestamp TEXT NOT NULL,
-    FOREIGN KEY(client_id) REFERENCES users(id) ON DELETE CASCADE
+-- ========== decisions_measurements ==========
+CREATE TABLE IF NOT EXISTS decisions_measurements (
+    id        INTEGER NOT NULL,
+    decision  REAL,            -- décision mesurée
+    timestamp TEXT NOT NULL,   -- date/heure (UTC) (texte)
+
+    PRIMARY KEY (id, timestamp),
+    FOREIGN KEY (id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
--- Historique des décisions (Puissance envoyée) mesurées/confirmées par le driver
-CREATE TABLE IF NOT EXISTS decisions_measures (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL,
-    decision REAL,                -- Valeur entre 0.0 et 1.0 (ou Watt selon config)
-    timestamp TEXT NOT NULL,
-    FOREIGN KEY(client_id) REFERENCES users(id) ON DELETE CASCADE
+-- ========== productions_measurements ==========
+CREATE TABLE IF NOT EXISTS productions_measurements (
+    id         INTEGER NOT NULL,
+    production REAL,           -- production PV mesurée
+    timestamp  TEXT NOT NULL,  -- date/heure (UTC) (texte)
+
+    PRIMARY KEY (id, timestamp),
+    FOREIGN KEY (id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
-
--- 4. Tables CALCULS & PRÉVISIONS (Intelligence)
-
--- Historique des prévisions météo utilisées (pour comparaison après coup)
-CREATE TABLE IF NOT EXISTS forecasts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL,
-    production REAL,              -- Production estimée
-    timestamp TEXT NOT NULL,
-    FOREIGN KEY(client_id) REFERENCES users(id) ON DELETE CASCADE
+-- ========== activation_keys ==========
+CREATE TABLE IF NOT EXISTS activation_keys (
+    activation_key TEXT PRIMARY KEY,
+    client_id      INTEGER NOT NULL,
+    status         TEXT DEFAULT 'issued',
+    created_at     TEXT NOT NULL,
+    expires_at     TEXT,
+    used_at        TEXT
 );
 
--- Historique des ordres donnés par l'algorithme d'optimisation
-CREATE TABLE IF NOT EXISTS decisions_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_id TEXT NOT NULL,
-    decision_report REAL,         -- La décision calculée (peut être stockée en JSON si complexe)
-    timestamp TEXT NOT NULL,
-    FOREIGN KEY(client_id) REFERENCES users(id) ON DELETE CASCADE
+-- ========== users_auth (GUI accounts) ==========
+CREATE TABLE IF NOT EXISTS users_auth (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    email          TEXT UNIQUE NOT NULL,
+    name           TEXT NOT NULL,
+    password_hash  TEXT NOT NULL,
+    client_id      INTEGER NOT NULL,
+    preferences    TEXT,
+    created_at     TEXT NOT NULL,
+
+    FOREIGN KEY (client_id) REFERENCES users_main(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
+-- ========== ui_sessions ==========
+CREATE TABLE IF NOT EXISTS ui_sessions (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
 
--- 5. INDEX (Optimisation des performances UI)
--- Accélère le chargement des graphiques "WHERE client_id = ? AND timestamp > ?"
-CREATE INDEX IF NOT EXISTS idx_temp_time ON temperatures(client_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_prod_time ON productions_measures(client_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_dec_meas_time ON decisions_measures(client_id, timestamp);
-CREATE INDEX IF NOT EXISTS idx_forecast_time ON forecasts(client_id, timestamp);
+    FOREIGN KEY (user_id) REFERENCES users_auth(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+);

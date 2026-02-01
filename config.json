@@ -1,0 +1,25 @@
+{
+  "update_with_db": {
+    "frequency": 2
+  },
+  "update_weather": {
+    "frequency": 1
+  },
+  "path_to_db": {
+    "path_to_db": "data/optimasol.db"
+  },
+  "optimizer_config": {
+    "horizon": 24,
+    "step_minutes": 15
+  },
+  "mqtt_config": {
+    "host": "localhost",
+    "port": 1883
+  },
+  "chack_efficiency_pannels": {
+    "frequency": 7
+  },
+  "min_distance": {
+    "minimal_distance": 15
+  }
+}

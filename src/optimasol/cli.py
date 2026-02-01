@@ -1,461 +1,408 @@
+from __future__ import annotations
+
 import argparse
 import json
+import logging
 import os
-import random
+import shutil
 import signal
-import sqlite3
 import subprocess
 import sys
 import time
 from datetime import datetime
-from getpass import getpass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict
 
-from .paths import (
-    BACKUPS_DIR,
-    CONFIG_DIR,
-    DATA_DIR,
-    DEFAULT_DB_PATH,
-    LOG_FILE,
-    PID_FILE,
-    PROJECT_ROOT,
-    RUNTIME_ROOT,
-    ensure_runtime_dirs,
-)
+from .config_loader import load_config_file
+from .database import DBManager
+from .default import BACKUPS_DIR, LOG_FILE, PID_FILE, PROJECT_ROOT, ensure_runtime_dirs
+from .logging_setup import setup_logging
+from .core import AllClients, Client
+from .drivers import ALL_DRIVERS
+
+logger = logging.getLogger(__name__)
 
 
-def _resolve_db_path() -> Path:
-    """Align with main.py logic to find the configured DB path."""
-    candidate = DEFAULT_DB_PATH
-    cfg_path = CONFIG_DIR / "path_to_db.json"
-    try:
-        with open(cfg_path, "r", encoding="utf-8") as f:
-            raw = json.load(f).get("path_to_db")
-        if raw and isinstance(raw, str) and raw.strip() and "..." not in raw:
-            db_path = Path(raw).expanduser()
-            if not db_path.is_absolute():
-                db_path = (RUNTIME_ROOT / raw).resolve()
-            candidate = db_path
-    except FileNotFoundError:
-        pass
-    except Exception:
-        pass
-    return candidate
+# ---------- Helpers ----------
 
-
-def _read_pid() -> Optional[int]:
+def _read_pid() -> int | None:
+    if not PID_FILE.exists():
+        return None
     try:
         return int(PID_FILE.read_text().strip())
     except Exception:
         return None
 
 
-def _is_process_running(pid: Optional[int]) -> bool:
-    if not pid:
-        return False
+def _is_process_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
-        return True
     except OSError:
         return False
+    return True
 
 
-def _build_env_with_src() -> dict:
-    """Ensure `src/` is on PYTHONPATH when running from the source tree."""
-    env = os.environ.copy()
-    src_dir = PROJECT_ROOT / "src"
-    if src_dir.exists():
-        src_path = str(src_dir)
-        current = env.get("PYTHONPATH", "")
-        paths = [p for p in current.split(os.pathsep) if p]
-        if src_path not in paths:
-            paths.insert(0, src_path)
-            env["PYTHONPATH"] = os.pathsep.join(paths)
-    return env
+def _resolve_db_path(config: dict) -> Path:
+    path_cfg = config.get("path_to_db", {})
+    raw = path_cfg.get("path_to_db") if isinstance(path_cfg, dict) else None
+    if not raw:
+        from .default import DEFAULT_DB_PATH
+        return DEFAULT_DB_PATH
+    path = Path(str(raw)).expanduser()
+    if not path.is_absolute():
+        path = (PROJECT_ROOT / path).resolve()
+    return path
 
 
-def cmd_start(_: argparse.Namespace) -> int:
+def _load_db_manager(config: dict) -> DBManager:
+    path_db = _resolve_db_path(config)
+    return DBManager(path_db)
+
+
+def _ensure_activation_table(db: DBManager) -> None:
+    """Ensure activation_keys exists without FK (allows pre-provisioned clients)."""
+    create_sql = """
+    CREATE TABLE IF NOT EXISTS activation_keys (
+        activation_key TEXT PRIMARY KEY,
+        client_id      INTEGER NOT NULL,
+        status         TEXT DEFAULT 'issued',
+        created_at     TEXT NOT NULL,
+        expires_at     TEXT,
+        used_at        TEXT
+    );
+    """
+    db.execute_commit(create_sql, ())
+
+    # If legacy table had FK, rebuild it without FK to allow keys before client exists.
+    fk_rows = db.execute_query("PRAGMA foreign_key_list('activation_keys')")
+    if fk_rows:
+        db.execute_commit(
+            """
+            CREATE TABLE IF NOT EXISTS activation_keys_new (
+                activation_key TEXT PRIMARY KEY,
+                client_id      INTEGER NOT NULL,
+                status         TEXT DEFAULT 'issued',
+                created_at     TEXT NOT NULL,
+                expires_at     TEXT,
+                used_at        TEXT
+            );
+            """,
+            (),
+        )
+        db.execute_commit(
+            """
+            INSERT OR IGNORE INTO activation_keys_new
+            (activation_key, client_id, status, created_at, expires_at, used_at)
+            SELECT activation_key, client_id, status, created_at, expires_at, used_at
+            FROM activation_keys;
+            """,
+            (),
+        )
+        db.execute_commit("DROP TABLE activation_keys;", ())
+        db.execute_commit("ALTER TABLE activation_keys_new RENAME TO activation_keys;", ())
+
+
+def _short_key() -> str:
+    import secrets
+    import string
+
+    alphabet = string.ascii_uppercase + string.digits
+    return "OPT-" + "".join(secrets.choice(alphabet) for _ in range(5))
+
+
+def _driver_from_payload(payload: Dict[str, Any]):
+    driver_type = payload.get("type") or payload.get("id") or payload.get("name")
+    if not driver_type:
+        raise ValueError("driver.type manquant dans le fichier JSON")
+
+    mapping = {}
+    for drv in ALL_DRIVERS:
+        try:
+            definition = drv.get_driver_def()
+            identifier = definition.get("id") or definition.get("name") or drv.__name__
+        except Exception:
+            identifier = drv.__name__
+        mapping[identifier] = drv
+        if hasattr(drv, "DRIVER_TYPE_ID"):
+            mapping[str(getattr(drv, "DRIVER_TYPE_ID"))] = drv
+
+    drv_cls = mapping.get(driver_type)
+    if drv_cls is None:
+        raise ValueError(f"Driver inconnu: {driver_type}")
+
+    drv_conf = payload.get("config") or {}
+    return drv_cls.dict_to_device(drv_conf)
+
+
+def _build_client_from_json(raw: Dict[str, Any]) -> Client:
+    try:
+        from optimiser_engine import Client as EngineClient
+        from weather_manager import Client as WeatherClient
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("optimiser_engine ou weather_manager manquant dans l'environnement") from exc
+
+    client_id = int(raw["id"])
+    engine_cfg = raw.get("engine") or {}
+    weather_cfg = raw.get("weather") or {}
+    driver_cfg = raw.get("driver") or {}
+
+    engine = EngineClient.from_dict(engine_cfg)
+    engine.client_id = client_id
+    weather = WeatherClient.from_dict(weather_cfg)
+    weather.client_id = client_id
+    driver = _driver_from_payload(driver_cfg)
+
+    return Client(client_id=client_id, client_engine=engine, client_weather=weather, driver=driver)
+
+
+# ---------- Command implementations ----------
+
+def cmd_start(args, config):
     ensure_runtime_dirs()
     pid = _read_pid()
-    if _is_process_running(pid):
-        print(f"Le service tourne déjà (PID {pid}).")
-        return 0
+    if pid and _is_process_alive(pid):
+        print(f"Service déjà actif (pid={pid})")
+        return
 
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LOG_FILE.touch(exist_ok=True)
-    log_fh = None
-    try:
-        log_fh = open(LOG_FILE, "a", encoding="utf-8")
-        process = subprocess.Popen(
-            [sys.executable, "-m", "optimasol.main"],
-            stdout=log_fh,
-            stderr=log_fh,
-            cwd=str(RUNTIME_ROOT),
-            env=_build_env_with_src(),
-        )
-        PID_FILE.write_text(str(process.pid), encoding="utf-8")
-        print(f"Service démarré en arrière-plan (PID {process.pid}). Logs -> {LOG_FILE}")
-    except Exception as exc:
-        print(f"Impossible de démarrer le service: {exc}")
-        return 1
-    finally:
-        try:
-            if log_fh:
-                log_fh.close()
-        except Exception:
-            pass
-    return 0
+    log_fh = open(LOG_FILE, "a", encoding="utf-8")
+    cmd = [sys.executable, "-m", "optimasol.service_runner"]
+    proc = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh, cwd=PROJECT_ROOT)
+    PID_FILE.write_text(str(proc.pid))
+    logger.info("Service démarré (pid=%s)", proc.pid)
+    print(f"Service démarré (pid={proc.pid})")
 
 
-def cmd_stop(_: argparse.Namespace) -> int:
+def cmd_stop(args, config):
     pid = _read_pid()
     if not pid:
-        print("Aucun PID trouvé, le service semble arrêté.")
-        PID_FILE.unlink(missing_ok=True)
-        return 0
+        print("Service non démarré")
+        return
 
-    if not _is_process_running(pid):
-        print("Processus introuvable, suppression du fichier PID.")
-        PID_FILE.unlink(missing_ok=True)
-        return 0
-
-    print(f"Arrêt du service (PID {pid})...")
     try:
         os.kill(pid, signal.SIGTERM)
-    except Exception as exc:
-        print(f"Erreur lors de l'arrêt: {exc}")
-        return 1
-
-    for _ in range(30):
-        if not _is_process_running(pid):
-            PID_FILE.unlink(missing_ok=True)
-            print("Service arrêté proprement.")
-            return 0
-        time.sleep(0.5)
-
-    print("Arrêt impossible (processus toujours actif).")
-    return 1
+        logger.info("Signal SIGTERM envoyé au service (pid=%s)", pid)
+    except ProcessLookupError:
+        print("Processus introuvable, suppression du pidfile")
+    PID_FILE.unlink(missing_ok=True)
+    print("Service arrêté")
 
 
-def cmd_restart(args: argparse.Namespace) -> int:
-    stop_code = cmd_stop(args)
-    start_code = cmd_start(args)
-    return stop_code or start_code
+def cmd_restart(args, config):
+    cmd_stop(args, config)
+    time.sleep(1)
+    cmd_start(args, config)
 
 
-def cmd_status(_: argparse.Namespace) -> int:
+def cmd_status(args, config):
     pid = _read_pid()
-    running = _is_process_running(pid)
-    db_path = _resolve_db_path()
-    db_state = "KO"
-    clients_count = "?"
-    conn = None
+    alive = pid and _is_process_alive(pid)
+    db = _load_db_manager(config)
+    db_ok = True
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.execute("SELECT COUNT(*) FROM users")
-        clients_count = cursor.fetchone()[0]
-        db_state = "OK"
-    except Exception as exc:
-        db_state = f"KO ({exc})"
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    print(f"Processus : {'Actif' if running else 'Inactif'}{f' (PID {pid})' if pid else ''}")
-    print(f"Base : {db_state} ({db_path})")
-    print(f"Clients en base : {clients_count}")
-    print(f"Logs : {LOG_FILE}")
-    return 0 if running else 1
+        db.execute_query("SELECT 1")
+    except Exception:
+        db_ok = False
+    print(f"Processus : {'Actif' if alive else 'Inactif'} (pid={pid or '-'})")
+    print(f"Connexion BDD : {'OK' if db_ok else 'Échec'}")
 
 
-def cmd_logs(_: argparse.Namespace) -> int:
-    ensure_runtime_dirs()
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LOG_FILE.touch(exist_ok=True)
-    print(f"Lecture en direct de {LOG_FILE} (Ctrl+C pour quitter)")
-    try:
-        with open(LOG_FILE, "r", encoding="utf-8") as f:
+def cmd_logs(args, config):
+    path = LOG_FILE
+    if not path.exists():
+        print("Aucun log pour le moment.")
+        return
+    if args.follow:
+        print(f"--- follow {path} ---")
+        with path.open() as f:
             f.seek(0, os.SEEK_END)
             while True:
                 line = f.readline()
                 if not line:
                     time.sleep(0.5)
                     continue
-                print(line, end="")
-    except KeyboardInterrupt:
-        print("\nArrêt du suivi des logs.")
-    return 0
+                sys.stdout.write(line)
+                sys.stdout.flush()
+    else:
+        with path.open() as f:
+            lines = f.readlines()[-args.lines :]
+        for l in lines:
+            sys.stdout.write(l)
 
 
-def cmd_update(_: argparse.Namespace) -> int:
-    try:
-        result = subprocess.run(
-            ["git", "pull"],
-            cwd=str(PROJECT_ROOT),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.stdout:
-            print(result.stdout.strip())
-        if result.stderr:
-            print(result.stderr.strip(), file=sys.stderr)
-        return result.returncode
-    except FileNotFoundError:
-        print("Git n'est pas disponible sur cette machine.")
-        return 1
+def cmd_update(args, config):
+    res = subprocess.run(["git", "-C", str(PROJECT_ROOT), "pull"], capture_output=True, text=True)
+    logger.info("Mise à jour git exécutée (rc=%s)", res.returncode)
+    sys.stdout.write(res.stdout)
+    sys.stderr.write(res.stderr)
 
 
-def cmd_db_backup(_: argparse.Namespace) -> int:
+def cmd_db_backup(args, config):
     ensure_runtime_dirs()
-    db_path = _resolve_db_path()
-    if not db_path.exists():
-        print(f"Aucune base trouvée à {db_path}")
-        return 1
-
-    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    dest = BACKUPS_DIR / f"optimasol-{timestamp}.db"
-    try:
-        import shutil
-
-        shutil.copy2(db_path, dest)
-    except Exception as exc:
-        print(f"Backup échoué: {exc}")
-        return 1
-
+    path_db = _resolve_db_path(config)
+    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    dest = BACKUPS_DIR / f"backup-{ts}.db"
+    shutil.copy2(path_db, dest)
+    logger.info("Backup DB créé: %s", dest)
     print(f"Backup créé: {dest}")
-    return 0
 
 
-def cmd_client_ls(_: argparse.Namespace) -> int:
-    db_path = _resolve_db_path()
-    conn = None
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT id, name, driver_id FROM users ORDER BY name").fetchall()
-    except Exception as exc:
-        print(f"Impossible de lire la base: {exc}")
-        return 1
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+def cmd_client_ls(args, config):
+    db = _load_db_manager(config)
+    all_clients = db.client_manager.get_all_clients()
+    print("ID | Driver | Statut")
+    for clt in all_clients.list_of_clients:
+        driver_name = clt.driver.__class__.__name__
+        print(f"{clt.client_id} | {driver_name} | OK")
 
+
+def cmd_client_show(args, config):
+    db = _load_db_manager(config)
+    cid = int(args.client_id)
+    rows = db.execute_query("SELECT id, config_engine, config_weather, driver_id, config_driver FROM users_main WHERE id = ?", (cid,))
     if not rows:
-        print("Aucun client enregistré.")
-        return 0
+        print("Client introuvable")
+        return
+    row = rows[0]
+    payload = {
+        "id": row[0],
+        "engine": json.loads(row[1]) if row[1] else {},
+        "weather": json.loads(row[2]) if row[2] else {},
+        "driver_id": row[3],
+        "driver_config": json.loads(row[4]) if row[4] else {},
+    }
+    print(json.dumps(payload, indent=2))
 
-    print(f"{'ID':36} | {'Nom':20} | Driver | Statut")
-    print("-" * 80)
-    for row in rows:
-        status = "configuré" if row["driver_id"] else "incomplet"
-        print(f"{row['id']:36} | {row['name'][:20]:20} | {row['driver_id'] or '-':7} | {status}")
-    return 0
+
+def cmd_client_rm(args, config):
+    db = _load_db_manager(config)
+    cid = int(args.client_id)
+    db.execute_commit("DELETE FROM users_main WHERE id = ?", (cid,))
+    logger.info("Client %s supprimé", cid)
+    print(f"Client {cid} supprimé (données associées en cascade)")
 
 
-def cmd_client_create(_: argparse.Namespace) -> int:
-    db_path = _resolve_db_path()
-    ensure_runtime_dirs()
+def cmd_client_create(args, config):
+    db = _load_db_manager(config)
+    file_path = Path(args.file)
+    if not file_path.exists():
+        print(f"Fichier introuvable: {file_path}")
+        return
     try:
-        from .database import DBManager
-    except Exception as exc:
-        print(f"Chargement du gestionnaire BDD impossible: {exc}")
-        return 1
-
-    manager = DBManager(db_path)
-    drivers = manager.get_available_drivers()
-    if not drivers:
-        print("Aucun driver disponible.")
-        return 1
-
-    print("=== Création d'un client ===")
-    name = input("Nom : ").strip()
-    email = input("Email : ").strip()
-    password = getpass("Mot de passe : ")
-
-    print("\nChoix du driver :")
-    for idx, drv in enumerate(drivers, start=1):
-        print(f"  {idx}) {drv['name']} ({drv['id']})")
-    try:
-        choice = int(input("Sélection : ").strip())
-        driver_type_id = drivers[choice - 1]["id"]
-    except Exception:
-        print("Choix invalide.")
-        return 1
-
-    serial_number = input("Numéro de série du device : ").strip()
+        raw = json.loads(file_path.read_text())
+    except Exception as exc:  # noqa: BLE001
+        print(f"JSON invalide: {exc}")
+        return
 
     try:
-        new_id = manager.create_client_ui(
-            name=name,
-            email=email,
-            password=password,
-            driver_type_id=driver_type_id,
-            serial_number=serial_number,
-        )
-        print(f"Client créé avec l'ID : {new_id}")
-        return 0
-    except Exception as exc:
-        print(f"Erreur lors de la création : {exc}")
-        return 1
+        new_client = _build_client_from_json(raw)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Échec création client depuis %s: %s", file_path, exc, exc_info=True)
+        print(f"Erreur: {exc}")
+        return
 
-
-def cmd_client_rm(args: argparse.Namespace) -> int:
-    client_id = args.client_id
-    confirmation = input(f"Confirmer la suppression du client {client_id} ? (yes/no) ").strip().lower()
-    if confirmation not in {"y", "yes"}:
-        print("Suppression annulée.")
-        return 1
-
-    db_path = _resolve_db_path()
+    all_clients = db.client_manager.get_all_clients()
     try:
-        from .database import DBManager
-    except Exception as exc:
-        print(f"Chargement du gestionnaire BDD impossible: {exc}")
-        return 1
-
-    manager = DBManager(db_path)
-    try:
-        ok = manager.delete_client_ui(client_id)
-        if ok:
-            print("Client supprimé.")
-            return 0
-        print("Aucun client supprimé.")
-    except Exception as exc:
-        print(f"Suppression échouée: {exc}")
-    return 1
+        all_clients.add(new_client)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Impossible d'ajouter le client: {exc}")
+        return
+    db.client_manager.store_all_clients(all_clients)
+    logger.info("Client %s ajouté via CLI", new_client.client_id)
+    print(f"Client {new_client.client_id} ajouté")
 
 
-def cmd_client_show(args: argparse.Namespace) -> int:
-    db_path = _resolve_db_path()
-    conn = None
-    try:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (args.client_id,)).fetchone()
-    except Exception as exc:
-        print(f"Impossible de lire la base: {exc}")
-        return 1
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    if not row:
-        print("Client introuvable.")
-        return 1
-
-    data = {key: row[key] for key in row.keys()}
-    print(json.dumps(data, indent=2, ensure_ascii=False))
-    return 0
+def cmd_key_gen(args, config):
+    db = _load_db_manager(config)
+    _ensure_activation_table(db)
+    cid = int(args.client_id)
+    key = _short_key()
+    ts = datetime.utcnow().isoformat()
+    db.execute_commit(
+        "INSERT OR REPLACE INTO activation_keys (activation_key, client_id, status, created_at) VALUES (?, ?, 'issued', ?)",
+        (key, cid, ts),
+    )
+    logger.info("Clé générée pour client %s: %s", cid, key)
+    print(key)
 
 
-def _load_activation_keys() -> dict:
-    ensure_runtime_dirs()
-    path = DATA_DIR / "activation_keys.json"
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+# ---------- Argument parser ----------
 
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="optimasol", description="CLI administrateur Optimasol")
+    sub = parser.add_subparsers(dest="command", required=True)
 
-def _save_activation_keys(payload: dict) -> None:
-    path = DATA_DIR / "activation_keys.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
+    sub.add_parser("start")
+    sub.add_parser("stop")
+    sub.add_parser("restart")
+    sub.add_parser("status")
 
+    p_logs = sub.add_parser("logs")
+    p_logs.add_argument("-f", "--follow", action="store_true", help="Suivi en direct (tail -f)")
+    p_logs.add_argument("-n", "--lines", type=int, default=50, help="Nombre de lignes à afficher")
 
-def _generate_activation_key(existing: set[str]) -> str:
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    while True:
-        token = "".join(random.choice(alphabet) for _ in range(4))
-        key = f"OPT-{token}"
-        if key not in existing:
-            return key
+    sub.add_parser("update")
 
+    p_db = sub.add_parser("db")
+    db_sub = p_db.add_subparsers(dest="db_cmd", required=True)
+    db_sub.add_parser("backup")
 
-def cmd_key_gen(args: argparse.Namespace) -> int:
-    client_id = args.client_id
-    db_path = _resolve_db_path()
-    conn = None
-    try:
-        conn = sqlite3.connect(db_path)
-        exists = conn.execute("SELECT 1 FROM users WHERE id = ? LIMIT 1", (client_id,)).fetchone()
-    except Exception as exc:
-        print(f"Impossible de lire la base: {exc}")
-        return 1
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+    p_client = sub.add_parser("client")
+    csub = p_client.add_subparsers(dest="client_cmd", required=True)
+    csub.add_parser("ls")
 
-    if not exists:
-        print("Client introuvable.")
-        return 1
+    p_create = csub.add_parser("create")
+    p_create.add_argument("file", help="Fichier JSON décrivant le client")
 
-    keys = _load_activation_keys()
-    existing_keys = {entry["key"] for entry in keys.values()} if keys else set()
-    new_key = _generate_activation_key(existing_keys)
-    keys[client_id] = {"key": new_key, "generated_at": datetime.utcnow().isoformat() + "Z"}
-    _save_activation_keys(keys)
-    print(f"Clé générée pour {client_id} : {new_key}")
-    return 0
+    p_rm = csub.add_parser("rm")
+    p_rm.add_argument("client_id")
 
+    p_show = csub.add_parser("show")
+    p_show.add_argument("client_id")
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="optimasol", description="Administration Optimasol")
-    sub = parser.add_subparsers(dest="command")
-    sub.required = True
-
-    sub.add_parser("start", help="Démarre le service").set_defaults(func=cmd_start)
-    sub.add_parser("stop", help="Arrête le service").set_defaults(func=cmd_stop)
-    sub.add_parser("restart", help="Redémarre le service").set_defaults(func=cmd_restart)
-    sub.add_parser("status", help="État du service et de la BDD").set_defaults(func=cmd_status)
-    sub.add_parser("logs", help="Affiche les logs en direct").set_defaults(func=cmd_logs)
-    sub.add_parser("update", help="Met à jour le dépôt (git pull)").set_defaults(func=cmd_update)
-
-    db_parser = sub.add_parser("db", help="Opérations sur la base de données")
-    db_sub = db_parser.add_subparsers(dest="db_command")
-    db_sub.required = True
-    db_sub.add_parser("backup", help="Crée un backup immédiat").set_defaults(func=cmd_db_backup)
-
-    client_parser = sub.add_parser("client", help="Gestion des clients")
-    client_sub = client_parser.add_subparsers(dest="client_command")
-    client_sub.required = True
-    client_sub.add_parser("ls", help="Liste des clients").set_defaults(func=cmd_client_ls)
-    client_sub.add_parser("create", help="Assistant de création").set_defaults(func=cmd_client_create)
-    rm = client_sub.add_parser("rm", help="Suppression d'un client")
-    rm.add_argument("client_id")
-    rm.set_defaults(func=cmd_client_rm)
-    show = client_sub.add_parser("show", help="Affiche la configuration d'un client")
-    show.add_argument("client_id")
-    show.set_defaults(func=cmd_client_show)
-
-    key_parser = sub.add_parser("key", help="Gestion des clés d'activation")
-    key_sub = key_parser.add_subparsers(dest="key_command")
-    key_sub.required = True
-    key_gen = key_sub.add_parser("gen", help="Génère une clé pour un client")
-    key_gen.add_argument("client_id")
-    key_gen.set_defaults(func=cmd_key_gen)
+    p_key = sub.add_parser("key")
+    ksub = p_key.add_subparsers(dest="key_cmd", required=True)
+    p_key_gen = ksub.add_parser("gen")
+    p_key_gen.add_argument("client_id")
 
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    parser = _build_parser()
+def main(argv: list[str] | None = None) -> None:
+    setup_logging()
+    config = load_config_file()
+
+    parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+
+    dispatch = {
+        "start": cmd_start,
+        "stop": cmd_stop,
+        "restart": cmd_restart,
+        "status": cmd_status,
+        "logs": cmd_logs,
+        "update": cmd_update,
+        "db": lambda a, c: cmd_db_backup(a, c) if a.db_cmd == "backup" else None,
+        "client": {
+            "ls": cmd_client_ls,
+            "create": cmd_client_create,
+            "rm": cmd_client_rm,
+            "show": cmd_client_show,
+        },
+        "key": {"gen": cmd_key_gen},
+    }
+
+    if args.command == "client":
+        cmd = dispatch["client"][args.client_cmd]
+        cmd(args, config)
+    elif args.command == "key":
+        cmd = dispatch["key"][args.key_cmd]
+        cmd(args, config)
+    elif args.command == "db":
+        cmd_db_backup(args, config)
+    else:
+        cmd = dispatch[args.command]
+        cmd(args, config)
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == "__main__":  # pragma: no cover
+    main()
