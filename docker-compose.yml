@@ -1,7 +1,6 @@
 services:
   optimasol:
     build: .
-    image: optimasol:local
     command: service
     ports:
       - "8000:8000"
