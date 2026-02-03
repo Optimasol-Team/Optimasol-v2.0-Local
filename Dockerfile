@@ -9,11 +9,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR ${APP_HOME}
 
 # System deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ RUN apt-get update && apt-get install -y --no-install-recommends \
     mosquitto \
     ca-certificates \
+    git \
     tini \
  && rm -rf /var/lib/apt/lists/*
+
+# Ensure broker data dir exists (mapped to volume)
+RUN mkdir -p /var/lib/mosquitto
 
 # Python venv
 RUN python -m venv ${VIRTUAL_ENV} \
@@ -36,9 +40,8 @@ COPY docker/mosquitto.conf /etc/mosquitto/mosquitto.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-VOLUME ["/opt/optimasol/data", "/opt/optimasol/backups"]
+VOLUME ["/opt/optimasol/data", "/opt/optimasol/backups", "/var/lib/mosquitto"]
 
 EXPOSE 8000 1883
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
-

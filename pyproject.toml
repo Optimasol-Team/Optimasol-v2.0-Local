@@ -12,6 +12,8 @@ dependencies = [
   "pandas",
   "paho-mqtt",
   "Werkzeug",
+  "optimiser-engine @ git+https://github.com/Optimasol-Team/Optimiser_Engine-v2.0.git",
+  "weather-manager-optimasol @ git+https://github.com/Optimasol-Team/Optimasol-Weather.git",
 ]
 
 [project.scripts]
