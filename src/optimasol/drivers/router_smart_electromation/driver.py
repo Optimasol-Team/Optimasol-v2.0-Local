@@ -10,7 +10,7 @@ class SmartEMDriver(BaseDriver):
     DRIVER_TYPE_ID = 1
     # MQTT configuration is injected at runtime (see optimasol.main._apply_runtime_config).
     # Defaults are kept locally to avoid any file-system dependency.
-    CONFIG_MQTT = {"host": "test.mosquitto.org", "port": 1883}
+    CONFIG_MQTT = {"host": "test.mosquitto.org", "port": 1883, "username": None, "password": None}
     
     @staticmethod
     def get_driver_def():
@@ -150,10 +150,15 @@ class SmartEMDriver(BaseDriver):
             - Failures are logged but don't raise exceptions (connection retry is automatic)
         """
         logger.info("SmartEMDriver %s: starting MQTT connection", self.serial)
-        host, port = self.CONFIG_MQTT['host'], self.CONFIG_MQTT['port']
+        host = self.CONFIG_MQTT.get("host")
+        port = int(self.CONFIG_MQTT.get("port", 1883))
+        username = self.CONFIG_MQTT.get("username")
+        password = self.CONFIG_MQTT.get("password")
         logger.debug("SmartEMDriver %s: attempting to connect to MQTT broker at %s:%d", 
                     self.serial, host, port)
         try:
+            if username:
+                self.client.username_pw_set(str(username), None if password is None else str(password))
             # On lance la connexion. 
             # Note: On ne fait PAS le subscribe ici, c'est le travail de on_connect.
             self.client.connect(host, port, 60)

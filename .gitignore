@@ -1,0 +1,23 @@
+.DS_Store
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Runtime files
+service.log
+service.pid
+data/
+backups/
+
+# Local config overrides
+config.local.json

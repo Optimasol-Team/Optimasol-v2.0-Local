@@ -61,6 +61,8 @@ def _apply_runtime_config(config: dict):
     SmartEMDriver.CONFIG_MQTT = {
         "host": config["mqtt_config"]["host"],
         "port": int(config["mqtt_config"]["port"]),
+        "username": config["mqtt_config"].get("username"),
+        "password": config["mqtt_config"].get("password"),
     }
 
 

@@ -36,7 +36,7 @@ DEFAULT_CONFIG = {
     "chack_efficiency_pannels": {"frequency": 7},
     "min_distance": {"minimal_distance": 15},
     "optimizer_config": {"horizon": 24, "step_minutes": 15},
-    "mqtt_config": {"host": "localhost", "port": 1883},
+    "mqtt_config": {"host": "localhost", "port": 1883, "username": None, "password": None},
     "path_to_db": {
         "path_to_db": str(
             PROJECT_ROOT
@@ -80,6 +80,8 @@ def resolve_config(config: dict) -> dict:
 
         mqtt_host = str(config["mqtt_config"]["host"])
         mqtt_port = int(config["mqtt_config"]["port"])
+        mqtt_username = config["mqtt_config"].get("username")
+        mqtt_password = config["mqtt_config"].get("password")
 
         path_db_raw = str(config["path_to_db"]["path_to_db"])
     except Exception:
@@ -93,5 +95,7 @@ def resolve_config(config: dict) -> dict:
     base["optimizer_config"]["step_minutes"] = step_minutes
     base["mqtt_config"]["host"] = mqtt_host
     base["mqtt_config"]["port"] = mqtt_port
+    base["mqtt_config"]["username"] = mqtt_username
+    base["mqtt_config"]["password"] = mqtt_password
     base["path_to_db"]["path_to_db"] = path_db_raw
     return base

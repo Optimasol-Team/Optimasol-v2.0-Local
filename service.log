@@ -4187,3 +4187,22 @@ KeyError: 1
 2026-02-02 00:08:27 | I | optimasol.tasks | Rapports de mesures envoyés à la BDD
 2026-02-02 00:08:27 | I | optimasol.main | Synchronisation BDD terminée
 2026-02-02 00:08:27 | I | optimasol.main | Synchronisation BDD terminée
+2026-02-03 22:40:14 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 22:40:14 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 22:40:14 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 22:40:14 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-03 23:23:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+2026-02-03 23:23:51 | E | optimasol.core.all_clients | Failed to add client: client ID 3 already exists

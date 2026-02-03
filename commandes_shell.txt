@@ -53,8 +53,11 @@ III) Gestion des Clients (Mode Administrateur) :
     Utile pour le débogage.
 
 
-IV) Provisioning (Installation chez le client) :
+IV) Provisioning (Installation chez le client) & UI:
 
 12) optimasol key gen <CLIENT_ID>
     Génère une clé d'activation courte (ex: OPT-A1B2) liée à ce client.
     Cette clé permet au boîtier physique de s'associer au compte lors de son premier allumage.
+
+13) optimaosl web : 
+Permet d'activer l'interface UI. 

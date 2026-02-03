@@ -236,6 +236,13 @@ def cmd_update(args, config):
     sys.stderr.write(res.stderr)
 
 
+def cmd_web(args, config):
+    subprocess.run(
+        [sys.executable, "-m", "uvicorn", "web.server:app", "--host", "0.0.0.0", "--port", "8000"],
+        check=False,
+    )
+
+
 def cmd_db_backup(args, config):
     ensure_runtime_dirs()
     path_db = _resolve_db_path(config)
@@ -341,6 +348,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_logs.add_argument("-n", "--lines", type=int, default=50, help="Nombre de lignes à afficher")
 
     sub.add_parser("update")
+    sub.add_parser("web")
 
     p_db = sub.add_parser("db")
     db_sub = p_db.add_subparsers(dest="db_cmd", required=True)
@@ -381,6 +389,7 @@ def main(argv: list[str] | None = None) -> None:
         "status": cmd_status,
         "logs": cmd_logs,
         "update": cmd_update,
+        "web": cmd_web,
         "db": lambda a, c: cmd_db_backup(a, c) if a.db_cmd == "backup" else None,
         "client": {
             "ls": cmd_client_ls,
