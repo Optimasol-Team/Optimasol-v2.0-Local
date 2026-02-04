@@ -9,51 +9,245 @@
 <body>
   <div id="app">
     <header>
-      <h1>Optimasol</h1>
+      <div class="brand">
+        <h1>Optimasol</h1>
+        <p>Plateforme client — inscription, configuration et suivi</p>
+      </div>
       <div id="user-info"></div>
     </header>
 
     <main>
-      <section id="auth-section">
+      <section id="auth-screen" class="grid-2">
         <div class="card">
           <h2>Connexion</h2>
           <form id="login-form">
-            <input type="email" name="email" placeholder="Email" required />
-            <input type="password" name="password" placeholder="Mot de passe" required />
+            <label>Email</label>
+            <input type="email" name="email" placeholder="ex: client@mail.com" required />
+            <label>Mot de passe</label>
+            <input type="password" name="password" placeholder="Votre mot de passe" required />
             <button type="submit">Se connecter</button>
           </form>
+          <div class="form-status" id="login-status"></div>
         </div>
 
         <div class="card">
-          <h2>Inscription (clé requise)</h2>
+          <h2>Inscription</h2>
           <form id="signup-form">
-            <input type="text" name="activation_key" placeholder="Clé d'accès" required />
-            <input type="text" name="name" placeholder="Nom" required />
-            <input type="email" name="email" placeholder="Email" required />
-            <input type="password" name="password" placeholder="Mot de passe" required />
-            <textarea name="client_json" placeholder='Collez ici le JSON client' rows="12" required></textarea>
-            <button type="submit">Créer le compte</button>
+            <label>Nom</label>
+            <input type="text" name="name" placeholder="Nom complet" required />
+            <label>Identifiant (fourni par l'admin)</label>
+            <input type="text" name="admin_identifier" placeholder="ID client" required />
+            <label>Email</label>
+            <input type="email" name="email" placeholder="ex: client@mail.com" required />
+            <label>Mot de passe</label>
+            <input type="password" name="password" placeholder="Minimum 8 caractères" required />
+            <label>Confirmer le mot de passe</label>
+            <input type="password" name="password_confirm" placeholder="Répéter le mot de passe" required />
+            <label>Clé d'accès</label>
+            <input type="text" name="activation_key" placeholder="OPT-XXXXX" required />
+            <button type="submit">Continuer</button>
           </form>
-          <p class="hint">Exemple disponible dans <code>client_sample_shell.json</code></p>
+          <div class="hint">La configuration détaillée se fait à l'étape suivante.</div>
+          <div class="form-status" id="signup-status"></div>
+        </div>
+
+        <div class="card hidden" id="resume-card">
+          <h2>Reprendre l'inscription</h2>
+          <p class="muted">Une inscription est en cours. Vous pouvez la reprendre ici.</p>
+          <button type="button" id="resume-signup">Reprendre</button>
+          <div class="form-status" id="resume-status"></div>
         </div>
       </section>
 
-      <section id="dashboard" class="hidden">
-        <div class="card">
-          <h2>Tableau de bord</h2>
-          <div id="summary"></div>
-        </div>
+      <section id="config-section" class="hidden">
+        <div class="card full">
+          <div class="wizard" id="config-wizard">
+            <div class="step done">1. Authentification</div>
+            <div class="step active">2. Configuration</div>
+            <div class="step">3. Tableau de bord</div>
+          </div>
 
-        <div class="card">
-          <h2>Mon client</h2>
-          <textarea id="client-editor" rows="16"></textarea>
-          <button id="save-client">Sauvegarder</button>
-          <div id="save-status"></div>
-        </div>
+          <div class="config-header">
+            <div>
+              <h2 id="config-title">Configuration du client</h2>
+              <p class="muted" id="config-subtitle">Complétez les informations pour finaliser l'inscription.</p>
+            </div>
+            <button type="button" class="ghost hidden" id="config-back">Retour</button>
+          </div>
 
-        <div class="card">
-          <h2>Historique</h2>
-          <div id="history"></div>
+          <form id="config-form">
+            <div class="form-grid">
+              <div class="block">
+                <h3>Matériel</h3>
+                <label>Driver</label>
+                <select id="driver-select" required></select>
+                <div class="driver-preview">
+                  <img id="driver-icon" alt="" />
+                  <div>
+                    <div id="driver-name"></div>
+                    <div id="driver-description" class="muted"></div>
+                  </div>
+                </div>
+                <div id="driver-fields"></div>
+              </div>
+
+              <div class="block">
+                <h3>Chauffe-eau</h3>
+                <label>Volume (L)</label>
+                <input type="number" id="wh-volume" min="10" value="200" required />
+                <label>Puissance (W)</label>
+                <input type="number" id="wh-power" min="100" value="2400" required />
+                <label>Coeff. d'isolation</label>
+                <input type="number" id="wh-insulation" step="0.01" value="0.8" required />
+                <label>Température eau froide (°C)</label>
+                <input type="number" id="wh-cold" step="0.1" value="15" required />
+              </div>
+
+              <div class="block">
+                <h3>Localisation</h3>
+                <label>Latitude</label>
+                <input type="number" id="loc-lat" step="0.0001" value="43.6" required />
+                <label>Longitude</label>
+                <input type="number" id="loc-lon" step="0.0001" value="1.44" required />
+                <label>Altitude (m)</label>
+                <input type="number" id="loc-alt" step="1" value="150" required />
+              </div>
+
+              <div class="block">
+                <h3>Panneaux photovoltaïques</h3>
+                <label>Azimuth (°)</label>
+                <input type="number" id="pv-azimuth" step="1" value="180" required />
+                <label>Inclinaison (°)</label>
+                <input type="number" id="pv-tilt" step="1" value="30" required />
+                <label>Surface panneau (m²)</label>
+                <input type="number" id="pv-surface" step="0.01" value="1.8" required />
+                <label>Puissance nominale (W)</label>
+                <input type="number" id="pv-power" step="1" value="350" required />
+                <label>Rendement global</label>
+                <input type="number" id="pv-rendement" step="0.01" value="0.18" required />
+              </div>
+
+              <div class="block">
+                <h3>Tarification & mode</h3>
+                <label>Mode tarifaire</label>
+                <select id="price-mode">
+                  <option value="BASE">BASE</option>
+                  <option value="HC_HP">HC/HP</option>
+                </select>
+                <div id="price-base-row">
+                  <label>Prix base (€/kWh)</label>
+                  <input type="number" id="price-base" step="0.001" value="0.18" required />
+                </div>
+                <div class="inline-row hidden" id="price-hp-hc-row">
+                  <div>
+                    <label>Prix HP (€/kWh)</label>
+                    <input type="number" id="price-hp" step="0.001" value="0.22" />
+                  </div>
+                  <div>
+                    <label>Prix HC (€/kWh)</label>
+                    <input type="number" id="price-hc" step="0.001" value="0.14" />
+                  </div>
+                </div>
+                <label>Prix revente (€/kWh)</label>
+                <input type="number" id="price-resell" step="0.001" value="0.06" required />
+                <label>Mode d'optimisation</label>
+                <select id="mode-optim">
+                  <option value="cost">Coût</option>
+                  <option value="autoconsommation">Autoconsommation</option>
+                </select>
+                <label>
+                  <input type="checkbox" id="feature-gradation" checked />
+                  Gradation activée
+                </label>
+              </div>
+
+              <div class="block">
+                <h3>Contraintes</h3>
+                <label>Température minimale (°C)</label>
+                <input type="number" id="min-temp" step="0.1" value="45" required />
+                <label>Bruit de fond (W)</label>
+                <input type="number" id="background-noise" step="0.1" value="250" />
+                <div class="list">
+                  <div class="list-header">
+                    <strong>Créneaux interdits</strong>
+                    <button type="button" class="ghost" id="forbidden-add">Ajouter</button>
+                  </div>
+                  <div id="forbidden-list"></div>
+                </div>
+              </div>
+
+              <div class="block">
+                <h3>Planning</h3>
+                <div class="list-header">
+                  <strong>Programmations</strong>
+                  <button type="button" class="ghost" id="planning-add">Ajouter</button>
+                </div>
+                <div id="planning-list"></div>
+              </div>
+            </div>
+
+            <details class="advanced">
+              <summary>Mode avancé (JSON)</summary>
+              <textarea id="client-json" rows="14" placeholder="Collez un client JSON complet ici."></textarea>
+              <div class="muted">Si ce champ est rempli, il sera utilisé à la place des champs ci-dessus.</div>
+            </details>
+
+            <button type="submit" id="config-submit">Finaliser l'inscription</button>
+            <div class="form-status" id="config-status"></div>
+          </form>
+        </div>
+      </section>
+
+      <section id="app-screen" class="hidden app-layout">
+        <aside class="sidebar">
+          <div class="nav-group">
+            <button class="nav-item active" data-panel="home">Accueil</button>
+            <button class="nav-item" data-panel="history">Historique</button>
+            <button class="nav-item" data-action="settings">Paramètres</button>
+            <button class="nav-item" data-panel="security">Sécurité</button>
+          </div>
+          <div class="nav-group">
+            <button class="nav-item danger" id="logout-btn">Déconnexion</button>
+          </div>
+        </aside>
+
+        <div class="content">
+          <section id="panel-home" class="panel">
+            <h2>Accueil</h2>
+            <p class="muted">Vue générale de votre installation.</p>
+            <div id="summary" class="summary-grid"></div>
+          </section>
+
+          <section id="panel-history" class="panel hidden">
+            <h2>Historique température</h2>
+            <div class="filter-row">
+              <div>
+                <label>Début</label>
+                <input type="datetime-local" id="history-start" />
+              </div>
+              <div>
+                <label>Fin</label>
+                <input type="datetime-local" id="history-end" />
+              </div>
+              <button type="button" id="history-load">Charger</button>
+            </div>
+            <canvas id="history-chart" height="220"></canvas>
+            <div id="history-list" class="muted"></div>
+          </section>
+
+          <section id="panel-security" class="panel hidden">
+            <h2>Changer le mot de passe</h2>
+            <form id="password-form">
+              <label>Mot de passe actuel</label>
+              <input type="password" id="pwd-current" required />
+              <label>Nouveau mot de passe</label>
+              <input type="password" id="pwd-new" required />
+              <label>Confirmer</label>
+              <input type="password" id="pwd-confirm" required />
+              <button type="submit">Mettre à jour</button>
+            </form>
+            <div id="pwd-status" class="form-status"></div>
+          </section>
         </div>
       </section>
     </main>

@@ -4206,3 +4206,125 @@ KeyError: 1
 /Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
   df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
 2026-02-03 23:23:51 | E | optimasol.core.all_clients | Failed to add client: client ID 3 already exists
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:36:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+2026-02-04 11:46:10 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 11:46:13 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 11:46:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:46:18 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:46:20 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:46:23 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:46:25 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:46:28 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - [Errno 61] Connection refused
+2026-02-04 11:57:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - [Errno 61] Connection refused
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+2026-02-04 13:50:09 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 13:50:14 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:19 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:24 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:29 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 13:50:34 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:39 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:44 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:50:49 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 13:50:54 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 13:55:32 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:55:37 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:55:42 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:55:47 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 13:55:52 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 13:55:57 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:56:02 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:56:07 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:56:12 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 13:56:17 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 13:56:58 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out
+2026-02-04 13:57:03 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:57:08 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:57:13 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 13:57:18 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 13:57:23 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:02:23 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:28 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:33 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:38 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 14:02:43 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:02:48 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:48 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out
+2026-02-04 14:02:53 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:53 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:58 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:02:58 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:03:03 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 14:03:03 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:03:08 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:03:08 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 14:03:13 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out
+2026-02-04 14:03:13 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:03:18 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+/Users/anaselb/Dev/Projects/Optimasol-v2.0-local/venv/lib/python3.14/site-packages/weather_manager/irradiance_converter/preprocessing.py:31: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df_clean = df_clean.fillna(method='bfill').fillna(method='ffill') # Sécurité ultime
+2026-02-04 14:34:29 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:34:34 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:34:39 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:34:44 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 14:34:49 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:34:54 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out
+2026-02-04 14:35:00 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:35:05 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:35:10 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER001: initial connection failed - timed out
+2026-02-04 14:35:15 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER045: initial connection failed - timed out
+2026-02-04 14:35:20 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER111: initial connection failed - timed out
+2026-02-04 14:35:25 | E | optimasol.drivers.router_smart_electromation.driver | SmartEMDriver PVROUTER099: initial connection failed - timed out

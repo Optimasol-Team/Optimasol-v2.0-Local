@@ -37,6 +37,18 @@ DEFAULT_CONFIG = {
     "min_distance": {"minimal_distance": 15},
     "optimizer_config": {"horizon": 24, "step_minutes": 15},
     "mqtt_config": {"host": "localhost", "port": 1883, "username": None, "password": None},
+    "smtp_config": {
+        "enabled": False,
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "username": None,
+        "password": None,
+        "from_email": None,
+        "use_tls": True,
+        "welcome_subject": "Bienvenue chez Optimasol",
+        "welcome_body": "Bonjour,\\n\\nBienvenue chez Optimasol.",
+        "welcome_pdf": "web/static/assets/guide.pdf",
+    },
     "path_to_db": {
         "path_to_db": str(
             PROJECT_ROOT
@@ -98,4 +110,29 @@ def resolve_config(config: dict) -> dict:
     base["mqtt_config"]["username"] = mqtt_username
     base["mqtt_config"]["password"] = mqtt_password
     base["path_to_db"]["path_to_db"] = path_db_raw
+
+    smtp_cfg = config.get("smtp_config") if isinstance(config, dict) else None
+    if isinstance(smtp_cfg, dict):
+        base["smtp_config"]["enabled"] = bool(smtp_cfg.get("enabled", base["smtp_config"]["enabled"]))
+        if smtp_cfg.get("host") is not None:
+            base["smtp_config"]["host"] = str(smtp_cfg.get("host"))
+        if smtp_cfg.get("port") is not None:
+            try:
+                base["smtp_config"]["port"] = int(smtp_cfg.get("port"))
+            except Exception:
+                pass
+        if "username" in smtp_cfg:
+            base["smtp_config"]["username"] = smtp_cfg.get("username")
+        if "password" in smtp_cfg:
+            base["smtp_config"]["password"] = smtp_cfg.get("password")
+        if "from_email" in smtp_cfg:
+            base["smtp_config"]["from_email"] = smtp_cfg.get("from_email")
+        if "use_tls" in smtp_cfg:
+            base["smtp_config"]["use_tls"] = bool(smtp_cfg.get("use_tls"))
+        if "welcome_subject" in smtp_cfg:
+            base["smtp_config"]["welcome_subject"] = str(smtp_cfg.get("welcome_subject"))
+        if "welcome_body" in smtp_cfg:
+            base["smtp_config"]["welcome_body"] = str(smtp_cfg.get("welcome_body"))
+        if "welcome_pdf" in smtp_cfg:
+            base["smtp_config"]["welcome_pdf"] = str(smtp_cfg.get("welcome_pdf"))
     return base

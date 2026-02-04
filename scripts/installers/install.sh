@@ -29,6 +29,9 @@ else
   APP_DIR="${APP_DIR}"
 fi
 
+MOSQ_MARKER_APP="${APP_DIR}/.optimasol_mosquitto_installed"
+MOSQ_MARKER_HOME="${HOME}/.optimasol/mosquitto.installed"
+
 read -r -p "Installer Mosquitto (broker MQTT) ? [Y/n]: " INSTALL_MOSQ
 INSTALL_MOSQ="${INSTALL_MOSQ:-Y}"
 
@@ -41,8 +44,14 @@ $SUDO apt-get install -y \
   python3-venv \
   python3-pip
 
+MOSQ_INSTALLED_BY_OPTIMASOL=0
 if [[ "$INSTALL_MOSQ" =~ ^[Yy]$ ]]; then
-  $SUDO apt-get install -y mosquitto
+  if ! dpkg -s mosquitto >/dev/null 2>&1; then
+    $SUDO apt-get install -y mosquitto
+    MOSQ_INSTALLED_BY_OPTIMASOL=1
+  else
+    $SUDO apt-get install -y mosquitto
+  fi
   echo "==> Activation du service mosquitto"
   $SUDO systemctl enable --now mosquitto >/dev/null 2>&1 || true
 else
@@ -76,6 +85,11 @@ mkdir -p data backups
 if command -v sudo >/dev/null 2>&1; then
   sudo ln -sfn "$APP_DIR/.venv/bin/optimasol" /usr/local/bin/optimasol
   sudo ln -sfn "$APP_DIR/.venv/bin/optimasol-service" /usr/local/bin/optimasol-service
+fi
+
+if [[ "$MOSQ_INSTALLED_BY_OPTIMASOL" -eq 1 ]]; then
+  mkdir -p "${HOME}/.optimasol"
+  touch "$MOSQ_MARKER_APP" "$MOSQ_MARKER_HOME"
 fi
 
 echo "OK. Edite config.json si necessaire, puis lance: optimasol start"

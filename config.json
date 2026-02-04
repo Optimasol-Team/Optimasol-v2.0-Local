@@ -18,6 +18,18 @@
     "username": null,
     "password": null
   },
+  "smtp_config": {
+    "enabled": false,
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "username": "votre.email@gmail.com",
+    "password": "app_password_gmail",
+    "from_email": "Optimasol <votre.email@gmail.com>",
+    "use_tls": true,
+    "welcome_subject": "Bienvenue chez Optimasol",
+    "welcome_body": "Bonjour,\\n\\nBienvenue chez Optimasol.",
+    "welcome_pdf": "web/static/assets/guide.pdf"
+  },
   "chack_efficiency_pannels": {
     "frequency": 7
   },
