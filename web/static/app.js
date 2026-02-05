@@ -74,7 +74,15 @@ async function api(path, options = {}) {
   const headers = options.headers || {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
   headers["Content-Type"] = "application/json";
-  const res = await fetch(path, { ...options, headers });
+
+  let res;
+  try {
+    res = await fetch(path, { ...options, headers });
+  } catch (e) {
+    //classify different cases of errors
+    throw new Error("Network error (Failed to fetch). Vérifie: serveur accessible, CORS/proxy, console F12.");
+  }
+
   if (!res.ok) {
     const msg = await res.text();
     throw new Error(msg || res.statusText);
