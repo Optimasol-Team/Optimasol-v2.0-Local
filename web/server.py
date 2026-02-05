@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, validator
 
 from optimasol.database import DBManager
@@ -23,8 +24,18 @@ from optimasol.logging_setup import setup_logging
 from optimasol.config_loader import load_config_file
 from optimasol.core import AllClients
 
+
 setup_logging()
 app = FastAPI(title="Optimasol GUI API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # Allow it during development first; once it’s stable, you can tighten it to your domain.
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 WEB_ROOT = PROJECT_ROOT / "web"
 STATIC_DIR = WEB_ROOT / "static"
