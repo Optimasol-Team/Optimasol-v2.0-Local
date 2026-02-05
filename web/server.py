@@ -178,19 +178,33 @@ def _new_session(db: DBManager, user_id: int) -> str:
     return token
 
 
+def _get_token(req: Request) -> str:
+    raw = (req.headers.get("Authorization") or "").strip()
+    if not raw:
+        return ""
+    if raw.lower().startswith("bearer "):
+        return raw[7:].strip()
+    return raw
+
 def _require_session(req: Request, db: DBManager):
-    token = req.headers.get("Authorization")
+    token = _get_token(req)
     if not token:
         raise HTTPException(401, "Missing token")
+
     rows = db.execute_query(
-        "SELECT user_id, expires_at FROM ui_sessions WHERE token = ?", (token.strip(),)
+        "SELECT user_id, expires_at FROM ui_sessions WHERE token = ?", (token,)
     )
     if not rows:
         raise HTTPException(401, "Invalid session")
+
     user_id, expires_at = rows[0]
     if datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+        # 过期顺手清理掉
+        db.execute_commit("DELETE FROM ui_sessions WHERE token = ?", (token,))
         raise HTTPException(401, "Session expired")
+
     return user_id
+
 
 
 def _load_client_template() -> dict:
@@ -705,6 +719,17 @@ def login(payload: LoginPayload):
         raise HTTPException(401, "Identifiants invalides")
     token = _new_session(db, user_id)
     return {"token": token}
+
+@app.post("/api/logout")
+def logout(req: Request):
+    db = _db()
+    _ensure_users_tables(db)
+
+    token = _get_token(req)
+    if token:
+        db.execute_commit("DELETE FROM ui_sessions WHERE token = ?", (token,))
+
+    return {"status": "ok"}
 
 
 @app.get("/api/me")

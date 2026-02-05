@@ -24,7 +24,7 @@
     }
   },
   "root": {
-    "level": "ERROR",
+    "level": "INFO",
     "handlers": ["console", "file"]
   }
 }

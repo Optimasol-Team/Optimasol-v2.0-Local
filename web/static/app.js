@@ -72,7 +72,7 @@ function setStatus(el, message, ok = false) {
 
 async function api(path, options = {}) {
   const headers = options.headers || {};
-  if (token) headers["Authorization"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   headers["Content-Type"] = "application/json";
   const res = await fetch(path, { ...options, headers });
   if (!res.ok) {
@@ -502,7 +502,15 @@ function openConfigForEdit() {
   }
 }
 
-function logout() {
+async function logout() {
+  // 1) 先通知后端注销（让后端删 ui_sessions）
+  try {
+    await api("/api/logout", { method: "POST" });
+  } catch (e) {
+    // 后端失败也不要阻止前端退出
+  }
+
+  // 2) 再清前端状态
   token = null;
   signupToken = null;
   currentClient = null;
@@ -511,6 +519,7 @@ function logout() {
   userInfo.textContent = "";
   showSection(authScreen);
 }
+
 
 loginForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
