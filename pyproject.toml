@@ -9,11 +9,16 @@ description = "Service Optimasol (service 24/24 + CLI administrateur)."
 requires-python = ">=3.9"
 authors = [{ name = "Optimasol" }]
 dependencies = [
+  "fastapi",
+  "email-validator",
+  "numpy",
   "pandas",
   "paho-mqtt",
   "Werkzeug",
+  "pydantic<2",
   "optimiser-engine @ git+https://github.com/Optimasol-Team/Optimiser_Engine-v2.0.git",
   "weather-manager-optimasol @ git+https://github.com/Optimasol-Team/Optimasol-Weather.git",
+  "uvicorn[standard]",
 ]
 
 [project.scripts]
