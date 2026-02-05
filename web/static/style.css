@@ -384,3 +384,14 @@ button:active {
     position: static;
   }
 }
+
+/* Hide navigation sidebar on Paramètres/Config page */
+body.nav-hidden .sidebar {
+  display: none !important;
+}
+
+/* Optional: make content full width when sidebar is hidden */
+body.nav-hidden .app-layout {
+  grid-template-columns: 1fr !important;
+}
+
