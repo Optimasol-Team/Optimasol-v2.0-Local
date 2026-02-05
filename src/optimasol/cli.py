@@ -238,7 +238,18 @@ def cmd_update(args, config):
 
 def cmd_web(args, config):
     subprocess.run(
-        [sys.executable, "-m", "uvicorn", "web.server:app", "--host", "0.0.0.0", "--port", "8000"],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "web.server:app",
+            "--app-dir",
+            str(PROJECT_ROOT),
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+        ],
         check=False,
     )
 
