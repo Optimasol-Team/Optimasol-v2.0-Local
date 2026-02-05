@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS productions_measurements (
 -- ========== activation_keys ==========
 CREATE TABLE IF NOT EXISTS activation_keys (
     activation_key TEXT PRIMARY KEY,
-    client_id      INTEGER NOT NULL,
+    client_id      INTEGER,
     status         TEXT DEFAULT 'issued',
     created_at     TEXT NOT NULL,
     expires_at     TEXT,

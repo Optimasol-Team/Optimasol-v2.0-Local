@@ -77,7 +77,7 @@ def _ensure_activation_table(db: DBManager):
         """
         CREATE TABLE IF NOT EXISTS activation_keys (
             activation_key TEXT PRIMARY KEY,
-            client_id      INTEGER NOT NULL,
+            client_id      INTEGER,
             status         TEXT DEFAULT 'issued',
             created_at     TEXT NOT NULL,
             expires_at     TEXT,
@@ -88,12 +88,19 @@ def _ensure_activation_table(db: DBManager):
     )
 
     fk_rows = db.execute_query("PRAGMA foreign_key_list('activation_keys')")
-    if fk_rows:
+    cols = db.execute_query("PRAGMA table_info('activation_keys')")
+    client_notnull = False
+    for col in cols:
+        if col[1] == "client_id":
+            client_notnull = bool(col[3])
+            break
+
+    if fk_rows or client_notnull:
         db.execute_commit(
             """
             CREATE TABLE IF NOT EXISTS activation_keys_new (
                 activation_key TEXT PRIMARY KEY,
-                client_id      INTEGER NOT NULL,
+                client_id      INTEGER,
                 status         TEXT DEFAULT 'issued',
                 created_at     TEXT NOT NULL,
                 expires_at     TEXT,
@@ -153,7 +160,7 @@ def _ensure_users_tables(db: DBManager):
         CREATE TABLE IF NOT EXISTS signup_pending (
             token           TEXT PRIMARY KEY,
             activation_key  TEXT NOT NULL,
-            client_id       INTEGER NOT NULL,
+            client_id       INTEGER,
             email           TEXT NOT NULL,
             name            TEXT NOT NULL,
             admin_identifier TEXT,
@@ -164,6 +171,42 @@ def _ensure_users_tables(db: DBManager):
         """,
         (),
     )
+
+    cols = db.execute_query("PRAGMA table_info('signup_pending')")
+    client_notnull = False
+    for col in cols:
+        if col[1] == "client_id":
+            client_notnull = bool(col[3])
+            break
+    if client_notnull:
+        db.execute_commit(
+            """
+            CREATE TABLE IF NOT EXISTS signup_pending_new (
+                token           TEXT PRIMARY KEY,
+                activation_key  TEXT NOT NULL,
+                client_id       INTEGER,
+                email           TEXT NOT NULL,
+                name            TEXT NOT NULL,
+                admin_identifier TEXT,
+                password_hash   TEXT NOT NULL,
+                created_at      TEXT NOT NULL,
+                expires_at      TEXT NOT NULL
+            );
+            """,
+            (),
+        )
+        db.execute_commit(
+            """
+            INSERT OR IGNORE INTO signup_pending_new
+            (token, activation_key, client_id, email, name, admin_identifier, password_hash, created_at, expires_at)
+            SELECT token, activation_key, client_id, email, name, admin_identifier, password_hash, created_at, expires_at
+            FROM signup_pending;
+            """,
+            (),
+        )
+        db.execute_commit("DROP TABLE signup_pending;", ())
+        db.execute_commit("ALTER TABLE signup_pending_new RENAME TO signup_pending;", ())
+
     db.execute_commit(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_signup_pending_activation
@@ -171,6 +214,12 @@ def _ensure_users_tables(db: DBManager):
         """,
         (),
     )
+
+
+def _next_client_id(db: DBManager) -> int:
+    row = db.execute_query("SELECT MAX(id) FROM users_main")
+    max_id = row[0][0] if row and row[0] else None
+    return int(max_id or 0) + 1
 
 
 def _cleanup_pending(db: DBManager):
@@ -580,6 +629,8 @@ def signup_complete(payload: SignupCompletePayload):
     if not rows:
         raise HTTPException(400, "Inscription introuvable ou expirée")
     activation_key, client_id, email, name, admin_identifier, password_hash, expires_at = rows[0]
+    if client_id is None:
+        client_id = _next_client_id(db)
     if datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
         db.execute_commit("DELETE FROM signup_pending WHERE token = ?", (payload.signup_token,))
         raise HTTPException(400, "Inscription expirée")
@@ -652,8 +703,8 @@ def signup_complete(payload: SignupCompletePayload):
     token = _new_session(db, user_id)
 
     db.execute_commit(
-        "UPDATE activation_keys SET status='used', used_at=? WHERE activation_key=?",
-        (_now_iso(), activation_key),
+        "UPDATE activation_keys SET status='used', used_at=?, client_id=COALESCE(client_id, ?) WHERE activation_key=?",
+        (_now_iso(), client_id, activation_key),
     )
 
     db.execute_commit("DELETE FROM signup_pending WHERE token = ?", (payload.signup_token,))
@@ -682,9 +733,19 @@ def signup(payload: SignupPayload):
         raise HTTPException(400, "Clé déjà utilisée ou expirée")
 
     # 2) Build client objects
+    if client_id is None:
+        client_id = _next_client_id(db)
+
+    client_payload = deepcopy(payload.client)
+    client_payload["id"] = client_id
+    if isinstance(client_payload.get("engine"), dict):
+        client_payload["engine"]["client_id"] = client_id
+    if isinstance(client_payload.get("weather"), dict):
+        client_payload["weather"]["client_id"] = client_id
+
     try:
         from optimasol.cli import _build_client_from_json  # reuse logic
-        new_client = _build_client_from_json(payload.client)
+        new_client = _build_client_from_json(client_payload)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Client invalide: {exc}") from exc
 
@@ -698,8 +759,8 @@ def signup(payload: SignupPayload):
 
     # 4) Mark key used
     db.execute_commit(
-        "UPDATE activation_keys SET status='used', used_at=? WHERE activation_key=?",
-        (_now_iso(), payload.activation_key),
+        "UPDATE activation_keys SET status='used', used_at=?, client_id=COALESCE(client_id, ?) WHERE activation_key=?",
+        (_now_iso(), client_id, payload.activation_key),
     )
 
     # 5) Create auth user

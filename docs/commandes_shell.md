@@ -22,7 +22,7 @@ This document describes the `optimasol` admin CLI (see `src/optimasol/cli.py`). 
 The JSON file for `client create` must include `id`, `engine`, `weather`, and `driver` blocks. The driver payload uses a `type` (driver id, name, or numeric `DRIVER_TYPE_ID`) plus a `config` object. See `src/optimasol/drivers/README.md` for a concrete example.
 
 **Provisioning**
-1. `optimasol key gen <client_id>` - Generates a short activation key (ex: `OPT-ABCDE`) and stores it in the DB.
+1. `optimasol key gen [client_id]` - Generates a short activation key (ex: `OPT-ABCDE`) and stores it in the DB. If `client_id` is omitted, the key can be linked to a new client at signup.
 
 **Web UI**
 1. `optimasol web` - Launches the web server with Uvicorn on port 8000.

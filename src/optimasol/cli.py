@@ -60,11 +60,11 @@ def _load_db_manager(config: dict) -> DBManager:
 
 
 def _ensure_activation_table(db: DBManager) -> None:
-    """Ensure activation_keys exists without FK (allows pre-provisioned clients)."""
+    """Ensure activation_keys exists and allows keys without a pre-provisioned client."""
     create_sql = """
     CREATE TABLE IF NOT EXISTS activation_keys (
         activation_key TEXT PRIMARY KEY,
-        client_id      INTEGER NOT NULL,
+        client_id      INTEGER,
         status         TEXT DEFAULT 'issued',
         created_at     TEXT NOT NULL,
         expires_at     TEXT,
@@ -73,14 +73,21 @@ def _ensure_activation_table(db: DBManager) -> None:
     """
     db.execute_commit(create_sql, ())
 
-    # If legacy table had FK, rebuild it without FK to allow keys before client exists.
     fk_rows = db.execute_query("PRAGMA foreign_key_list('activation_keys')")
-    if fk_rows:
+    cols = db.execute_query("PRAGMA table_info('activation_keys')")
+    client_notnull = False
+    for col in cols:
+        if col[1] == "client_id":
+            client_notnull = bool(col[3])
+            break
+
+    # Rebuild legacy tables (FK or NOT NULL on client_id).
+    if fk_rows or client_notnull:
         db.execute_commit(
             """
             CREATE TABLE IF NOT EXISTS activation_keys_new (
                 activation_key TEXT PRIMARY KEY,
-                client_id      INTEGER NOT NULL,
+                client_id      INTEGER,
                 status         TEXT DEFAULT 'issued',
                 created_at     TEXT NOT NULL,
                 expires_at     TEXT,
@@ -332,14 +339,17 @@ def cmd_client_create(args, config):
 def cmd_key_gen(args, config):
     db = _load_db_manager(config)
     _ensure_activation_table(db)
-    cid = int(args.client_id)
+    cid = int(args.client_id) if args.client_id is not None else None
     key = _short_key()
     ts = datetime.utcnow().isoformat()
     db.execute_commit(
         "INSERT OR REPLACE INTO activation_keys (activation_key, client_id, status, created_at) VALUES (?, ?, 'issued', ?)",
         (key, cid, ts),
     )
-    logger.info("Clé générée pour client %s: %s", cid, key)
+    if cid is None:
+        logger.info("Clé générée sans client: %s", key)
+    else:
+        logger.info("Clé générée pour client %s: %s", cid, key)
     print(key)
 
 
@@ -381,7 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_key = sub.add_parser("key")
     ksub = p_key.add_subparsers(dest="key_cmd", required=True)
     p_key_gen = ksub.add_parser("gen")
-    p_key_gen.add_argument("client_id")
+    p_key_gen.add_argument("client_id", nargs="?", help="ID client (optionnel)")
 
     return parser
 
