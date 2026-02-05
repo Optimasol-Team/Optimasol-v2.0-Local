@@ -95,6 +95,8 @@ function showSection(section) {
   configSection?.classList.add("hidden");
   appScreen?.classList.add("hidden");
   section?.classList.remove("hidden");
+  document.body.classList.toggle("nav-hidden", section === configSection);
+}
 }
 
 function showResumeCard(show) {
