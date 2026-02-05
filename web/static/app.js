@@ -92,6 +92,7 @@ function showSection(section) {
 function showResumeCard(show) {
   if (!resumeCard) return;
   resumeCard.classList.toggle("hidden", !show);
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function setActivePanel(panel) {
