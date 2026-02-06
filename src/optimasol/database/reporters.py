@@ -29,7 +29,12 @@ class Reporter:
            On peut laisser planter ou catcher l'erreur selon la stratégie voulue.
         """
         ts = time.isoformat() if hasattr(time, "isoformat") else str(time)
-        query = "INSERT INTO temperatures (id, temperature, timestamp) VALUES (?, ?, ?)"
+        query = """
+            INSERT INTO temperatures (id, temperature, timestamp)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id, timestamp) DO UPDATE SET
+                temperature = excluded.temperature
+        """
         self.db_manager.execute_commit(query, (client_id, temperature, ts))
     
     def report_production_forecast(self, client_id: int, production_forecast: float, time: str) -> None:
@@ -62,7 +67,12 @@ class Reporter:
         2. Exécution via db_manager.
         """
         ts = time.isoformat() if hasattr(time, "isoformat") else str(time)
-        query = "INSERT INTO productions_measurements (id, production, timestamp) VALUES (?, ?, ?)"
+        query = """
+            INSERT INTO productions_measurements (id, production, timestamp)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id, timestamp) DO UPDATE SET
+                production = excluded.production
+        """
         self.db_manager.execute_commit(query, (client_id, production_measured, ts))
     
     def report_decision_taken(self, client_id: int, decision: float, time: str) -> None:
@@ -91,5 +101,10 @@ class Reporter:
         2. Exécution via db_manager.
         """
         ts = time.isoformat() if hasattr(time, "isoformat") else str(time)
-        query = "INSERT INTO decisions_measurements (id, decision, timestamp) VALUES (?, ?, ?)"
+        query = """
+            INSERT INTO decisions_measurements (id, decision, timestamp)
+            VALUES (?, ?, ?)
+            ON CONFLICT(id, timestamp) DO UPDATE SET
+                decision = excluded.decision
+        """
         self.db_manager.execute_commit(query, (client_id, decision, ts))
