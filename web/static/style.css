@@ -97,6 +97,22 @@ label {
   font-weight: 500;
 }
 
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inline-check input {
+  width: auto;
+  margin: 0;
+}
+
+.inline-check span {
+  font-weight: 500;
+}
+
 input, select, textarea, button {
   width: 100%;
   border-radius: 10px;
@@ -136,7 +152,7 @@ button:active {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .form-status {
@@ -394,4 +410,3 @@ body.nav-hidden .sidebar {
 body.nav-hidden .app-layout {
   grid-template-columns: 1fr !important;
 }
-

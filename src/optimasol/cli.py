@@ -141,7 +141,7 @@ def _driver_from_payload(payload: Dict[str, Any]):
     return drv_cls.dict_to_device(drv_conf)
 
 
-def _build_client_from_json(raw: Dict[str, Any]) -> Client:
+def _build_client_from_json(raw: Dict[str, Any], start_driver: bool = True) -> Client:
     try:
         from optimiser_engine import Client as EngineClient
         from weather_manager import Client as WeatherClient
@@ -159,7 +159,13 @@ def _build_client_from_json(raw: Dict[str, Any]) -> Client:
     weather.client_id = client_id
     driver = _driver_from_payload(driver_cfg)
 
-    return Client(client_id=client_id, client_engine=engine, client_weather=weather, driver=driver)
+    return Client(
+        client_id=client_id,
+        client_engine=engine,
+        client_weather=weather,
+        driver=driver,
+        start_driver=start_driver,
+    )
 
 
 # ---------- Command implementations ----------
@@ -301,9 +307,45 @@ def cmd_client_show(args, config):
 def cmd_client_rm(args, config):
     db = _load_db_manager(config)
     cid = int(args.client_id)
+    cid_str = str(cid)
+
+    # 1) Delete rows that reference client_id explicitly (legacy + current tables).
+    tables = db.execute_query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    )
+    for (table,) in tables:
+        cols = db.execute_query(f"PRAGMA table_info('{table}')")
+        col_names = {c[1] for c in cols}
+        if "client_id" in col_names:
+            db.execute_commit(f"DELETE FROM {table} WHERE client_id = ?", (cid,))
+            db.execute_commit(f"DELETE FROM {table} WHERE client_id = ?", (cid_str,))
+
+    # 2) Tables that store client ID in an "id" column.
+    id_tables = {
+        "Decisions",
+        "Productions",
+        "decisions_measurements",
+        "productions_measurements",
+    }
+    for table in id_tables:
+        exists = db.execute_query(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+        )
+        if exists:
+            db.execute_commit(f"DELETE FROM {table} WHERE id = ?", (cid,))
+
+    # 3) Legacy users table (id stored as TEXT in some versions).
+    exists = db.execute_query(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'users'"
+    )
+    if exists:
+        db.execute_commit("DELETE FROM users WHERE id = ?", (cid_str,))
+
+    # 4) Finally remove the main client row to trigger FK cascades.
     db.execute_commit("DELETE FROM users_main WHERE id = ?", (cid,))
-    logger.info("Client %s supprimé", cid)
-    print(f"Client {cid} supprimé (données associées en cascade)")
+
+    logger.info("Client %s supprimé (purge complète)", cid)
+    print(f"Client {cid} supprimé (purge complète)")
 
 
 def cmd_client_create(args, config):

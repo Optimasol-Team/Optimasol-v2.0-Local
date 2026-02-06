@@ -13,7 +13,7 @@
     "step_minutes": 15
   },
   "mqtt_config": {
-    "host": "localhost",
+    "host": "test.mosquitto.org",
     "port": 1883,
     "username": null,
     "password": null

@@ -97,7 +97,6 @@ function showSection(section) {
   section?.classList.remove("hidden");
   document.body.classList.toggle("nav-hidden", section === configSection);
 }
-}
 
 function showResumeCard(show) {
   if (!resumeCard) return;
@@ -481,10 +480,13 @@ function fillFormFromClient(client) {
   (engine.constraints?.forbidden_slots || []).forEach(addForbiddenRow);
   (engine.planning || []).forEach(addPlanningRow);
 
-  const def = drivers.find((d) => d.id === driver.type) || drivers[0];
+  const driverPayload = driver?.config ? driver.config : (driver || {});
+  const def =
+    drivers.find((d) => d.id === driver?.type || d.id === driver?.id || d.id === driver?.name) ||
+    drivers[0];
   if (def) {
     driverSelect.value = def.id;
-    renderDriver(def, driver.config || {});
+    renderDriver(def, driverPayload);
   }
 }
 
@@ -554,7 +556,6 @@ signupForm?.addEventListener("submit", async (e) => {
   const form = new FormData(signupForm);
   const payload = {
     name: form.get("name"),
-    admin_identifier: form.get("admin_identifier"),
     email: form.get("email"),
     password: form.get("password"),
     password_confirm: form.get("password_confirm"),

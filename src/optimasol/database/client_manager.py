@@ -20,7 +20,7 @@ class ClientManager:
         """
         self.db_manager = db_manager
 
-    def get_all_clients(self) -> AllClients:
+    def get_all_clients(self, start_driver: bool = True) -> AllClients:
         """
         BUT : 
         Reconstruire l'objet complexe AllClients à partir des tables relationnelles SQL.
@@ -104,6 +104,7 @@ class ClientManager:
                 client_engine=client_engine,
                 client_weather=client_weather,
                 driver=driver_obj,
+                start_driver=start_driver,
             )
 
             clients[client_id] = client_obj

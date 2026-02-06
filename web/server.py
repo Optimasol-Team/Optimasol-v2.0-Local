@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, validator
 
 from optimasol.database import DBManager
-from optimasol.default import PROJECT_ROOT
+from optimasol.default import DEFAULT_DB_PATH, PROJECT_ROOT
 from optimasol.logging_setup import setup_logging
 from optimasol.config_loader import load_config_file
 from optimasol.core import AllClients
@@ -67,9 +67,20 @@ def _config() -> dict:
     return load_config_file()
 
 
+def _resolve_db_path(cfg: dict) -> Path:
+    path_cfg = cfg.get("path_to_db", {})
+    raw = path_cfg.get("path_to_db") if isinstance(path_cfg, dict) else None
+    if not raw:
+        return DEFAULT_DB_PATH
+    path = Path(str(raw)).expanduser()
+    if not path.is_absolute():
+        path = (PROJECT_ROOT / path).resolve()
+    return path
+
+
 def _db():
     cfg = _config()
-    return DBManager(Path(cfg["path_to_db"]["path_to_db"]))
+    return DBManager(_resolve_db_path(cfg))
 
 
 def _ensure_activation_table(db: DBManager):
@@ -217,9 +228,45 @@ def _ensure_users_tables(db: DBManager):
 
 
 def _next_client_id(db: DBManager) -> int:
-    row = db.execute_query("SELECT MAX(id) FROM users_main")
-    max_id = row[0][0] if row and row[0] else None
-    return int(max_id or 0) + 1
+    rows = db.execute_query("SELECT id FROM users_main ORDER BY id")
+    next_id = 1
+    for (cid,) in rows:
+        try:
+            cid_int = int(cid)
+        except Exception:
+            continue
+        if cid_int == next_id:
+            next_id += 1
+        elif cid_int > next_id:
+            break
+    return next_id
+
+
+def _extract_serial(driver_obj) -> str | None:
+    try:
+        data = driver_obj.device_to_dict()
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    serial = data.get("serial_number")
+    return str(serial) if serial else None
+
+
+def _ensure_unique_serial(db: DBManager, serial: str | None, exclude_client_id: int | None = None) -> None:
+    if not serial:
+        return
+    rows = db.execute_query("SELECT id, config_driver FROM users_main")
+    for row in rows:
+        cid, cfg = row[0], row[1]
+        if exclude_client_id is not None and int(cid) == int(exclude_client_id):
+            continue
+        try:
+            data = json.loads(cfg) if cfg else {}
+        except Exception:
+            data = {}
+        if isinstance(data, dict) and data.get("serial_number") == serial:
+            raise HTTPException(409, f"Numéro de série déjà utilisé par le client {cid}")
 
 
 def _cleanup_pending(db: DBManager):
@@ -466,7 +513,6 @@ class SignupStartPayload(BaseModel):
     name: str
     password: str
     password_confirm: str
-    admin_identifier: str
 
     @validator("name")
     def start_name_not_empty(cls, v):
@@ -580,7 +626,7 @@ def signup_start(payload: SignupStartPayload):
             client_id,
             payload.email,
             payload.name,
-            payload.admin_identifier,
+            None,
             password_hash,
             now.isoformat(),
             exp.isoformat(),
@@ -676,18 +722,19 @@ def signup_complete(payload: SignupCompletePayload):
 
     try:
         from optimasol.cli import _build_client_from_json
-        new_client = _build_client_from_json(client_payload)
+        new_client = _build_client_from_json(client_payload, start_driver=False)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Client invalide: {exc}") from exc
 
-    all_clients = db.client_manager.get_all_clients()
+    all_clients = db.client_manager.get_all_clients(start_driver=False)
     try:
+        _ensure_unique_serial(db, _extract_serial(new_client.driver))
         all_clients.add(new_client)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Ajout client impossible: {exc}") from exc
     db.client_manager.store_all_clients(all_clients)
 
-    preferences = json.dumps({"admin_identifier": admin_identifier})
+    preferences = json.dumps({"admin_identifier": admin_identifier} if admin_identifier else {})
     try:
         db.execute_commit(
             "INSERT INTO users_auth (email, name, password_hash, client_id, preferences, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -745,13 +792,14 @@ def signup(payload: SignupPayload):
 
     try:
         from optimasol.cli import _build_client_from_json  # reuse logic
-        new_client = _build_client_from_json(client_payload)
+        new_client = _build_client_from_json(client_payload, start_driver=False)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Client invalide: {exc}") from exc
 
     # 3) Persist client
-    all_clients = db.client_manager.get_all_clients()
+    all_clients = db.client_manager.get_all_clients(start_driver=False)
     try:
+        _ensure_unique_serial(db, _extract_serial(new_client.driver))
         all_clients.add(new_client)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Ajout client impossible: {exc}") from exc
@@ -824,7 +872,7 @@ def get_client(req: Request):
     db = _db()
     user_id = _require_session(req, db)
     client_id = db.execute_query("SELECT client_id FROM users_auth WHERE id=?", (user_id,))[0][0]
-    all_clients = db.client_manager.get_all_clients()
+    all_clients = db.client_manager.get_all_clients(start_driver=False)
     client = all_clients.which_client_by_id(client_id)
     if client is None:
         raise HTTPException(404, "Client manquant")
@@ -844,11 +892,12 @@ def update_client(req: Request, payload: ClientUpdatePayload):
 
     try:
         from optimasol.cli import _build_client_from_json  # reuse logic
-        candidate = _build_client_from_json({**payload.client, "id": client_id})
+        candidate = _build_client_from_json({**payload.client, "id": client_id}, start_driver=False)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Client invalide: {exc}") from exc
 
-    all_clients = db.client_manager.get_all_clients()
+    all_clients = db.client_manager.get_all_clients(start_driver=False)
+    _ensure_unique_serial(db, _extract_serial(candidate.driver), exclude_client_id=client_id)
     found = False
     new_list = []
     for c in all_clients.list_of_clients:

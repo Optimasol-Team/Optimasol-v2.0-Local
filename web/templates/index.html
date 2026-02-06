@@ -35,8 +35,6 @@
           <form id="signup-form">
             <label>Nom</label>
             <input type="text" name="name" placeholder="Nom complet" required />
-            <label>Identifiant (fourni par l'admin)</label>
-            <input type="text" name="admin_identifier" placeholder="ID client" required />
             <label>Email</label>
             <input type="email" name="email" placeholder="ex: client@mail.com" required />
             <label>Mot de passe</label>
@@ -155,9 +153,9 @@
                   <option value="cost">Coût</option>
                   <option value="autoconsommation">Autoconsommation</option>
                 </select>
-                <label>
+                <label class="inline-check">
                   <input type="checkbox" id="feature-gradation" checked />
-                  Gradation activée
+                  <span>Mode gradation</span>
                 </label>
               </div>
 

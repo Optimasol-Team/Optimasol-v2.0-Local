@@ -47,11 +47,14 @@ class Client:
     HORIZON_HOURS = 24
     STEP_MINUTES = 15
 
-    def __init__(self, 
-                 client_id: int, 
-                 client_engine: Clt_engine, 
-                 client_weather: Clt_weather, 
-                 driver: BaseDriver):
+    def __init__(
+        self,
+        client_id: int,
+        client_engine: Clt_engine,
+        client_weather: Clt_weather,
+        driver: BaseDriver,
+        start_driver: bool = True,
+    ):
         """Initialize a Client instance.
         
         Sets up the client with required components and initializes data collection
@@ -95,8 +98,11 @@ class Client:
         self.driver.on_receive_power = self._update_power
         self.production_forecast = None 
         logger.debug("Client %s: callback hooks registered", client_id)
-        self.driver.start() # Démarrer le driver.
-        logger.info("Client %s initialized successfully and driver started", client_id) 
+        if start_driver:
+            self.driver.start()  # Démarrer le driver.
+            logger.info("Client %s initialized successfully and driver started", client_id)
+        else:
+            logger.info("Client %s initialized (driver not started)", client_id)
 
     # --- 3. LES FONCTIONS DE MISE A JOUR (Callbacks) ---
     
