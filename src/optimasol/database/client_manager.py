@@ -225,11 +225,17 @@ class ClientManager:
                 (driver_id, driver_name),
             )
 
-            # 2) Insérer / Mettre à jour le client
+            # 2) Insérer / Mettre à jour le client sans supprimer la ligne (évite de casser les FK)
             self.db_manager.execute_commit(
                 """
-                INSERT OR REPLACE INTO users_main (id, weather_ref, config_engine, config_weather, driver_id, config_driver)
+                INSERT INTO users_main (id, weather_ref, config_engine, config_weather, driver_id, config_driver)
                 VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    weather_ref = excluded.weather_ref,
+                    config_engine = excluded.config_engine,
+                    config_weather = excluded.config_weather,
+                    driver_id = excluded.driver_id,
+                    config_driver = excluded.config_driver
                 """,
                 (client_id, weather_ref, config_engine_yaml, config_weather_yaml, driver_id, config_driver_yaml),
             )
