@@ -359,6 +359,44 @@ def _deep_merge(base: dict, updates: dict) -> dict:
     return base
 
 
+def _price_mode(value: Any) -> str:
+    mode = str(value or "").strip().upper()
+    if mode == "BASE":
+        return "BASE"
+    if mode in {"HPHC", "HP/HC", "HC/HP", "HP-HC", "HC-HP"}:
+        return "HPHC"
+    return "BASE"
+
+
+def _to_float(value: Any, default: float) -> float:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        value = value.strip().replace(",", ".")
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _normalize_prices(prices: Any, defaults: Optional[Dict[str, Any]] = None) -> Dict[str, float | str]:
+    source = prices if isinstance(prices, dict) else {}
+    base_defaults = defaults if isinstance(defaults, dict) else {}
+
+    mode = _price_mode(source.get("mode", base_defaults.get("mode")))
+    normalized: Dict[str, float | str] = {
+        "mode": mode,
+        "resell_price": _to_float(source.get("resell_price"), _to_float(base_defaults.get("resell_price"), 0.06)),
+    }
+
+    if mode == "HPHC":
+        normalized["hp_price"] = _to_float(source.get("hp_price"), _to_float(base_defaults.get("hp_price"), 0.22))
+        normalized["hc_price"] = _to_float(source.get("hc_price"), _to_float(base_defaults.get("hc_price"), 0.14))
+    else:
+        normalized["base_price"] = _to_float(source.get("base_price"), _to_float(base_defaults.get("base_price"), 0.18))
+    return normalized
+
+
 def _build_client_from_assistant(client_id: int, assistant: dict) -> dict:
     template = deepcopy(_load_client_template())
     template["id"] = client_id
@@ -372,7 +410,9 @@ def _build_client_from_assistant(client_id: int, assistant: dict) -> dict:
     driver = assistant.get("driver") or {}
 
     if isinstance(engine, dict):
+        default_prices = deepcopy(template["engine"].get("prices", {}))
         template["engine"] = _deep_merge(template["engine"], engine)
+        template["engine"]["prices"] = _normalize_prices(template["engine"].get("prices"), default_prices)
     if isinstance(weather, dict):
         template["weather"] = _deep_merge(template["weather"], weather)
     if isinstance(driver, dict) and driver:

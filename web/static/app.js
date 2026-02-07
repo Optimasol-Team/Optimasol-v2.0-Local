@@ -134,6 +134,34 @@ function normalizeFieldValue(input) {
   return input.value;
 }
 
+function normalizePriceMode(value, fallback = "BASE") {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (!raw) return fallback;
+  if (raw === "BASE") return "BASE";
+  if (raw === "HPHC" || raw === "HP/HC" || raw === "HC/HP" || raw === "HP-HC" || raw === "HC-HP") {
+    return "HPHC";
+  }
+  return fallback;
+}
+
+function inferPriceMode(prices = {}) {
+  const normalized = normalizePriceMode(prices?.mode, "");
+  if (normalized) return normalized;
+  const hasHpHcPrices = prices?.hp_price != null || prices?.hc_price != null;
+  return hasHpHcPrices ? "HPHC" : "BASE";
+}
+
+function parseDecimalInput(input, fallback = 0) {
+  if (!input) return fallback;
+  if (Number.isFinite(input.valueAsNumber)) return input.valueAsNumber;
+
+  const raw = String(input.value ?? "").trim();
+  if (!raw) return fallback;
+  const normalized = raw.replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function renderDriverFields(def, values = {}) {
   driverFields.innerHTML = "";
   if (!def || !def.form_schema) return;
@@ -224,15 +252,19 @@ driverSelect?.addEventListener("change", () => {
 
 function updatePriceFields() {
   if (!priceMode) return;
-  const isHpHc = priceMode.value !== "BASE";
+  const mode = normalizePriceMode(priceMode.value, "BASE");
+  priceMode.value = mode;
+  const isHpHc = mode === "HPHC";
   const showBase = !isHpHc;
-  // Toggle both class and inline display to avoid stale styles.
+  // Toggle class + hidden + display to avoid stale states across browsers.
   if (priceBaseRow) {
     priceBaseRow.classList.toggle("hidden", !showBase);
+    priceBaseRow.hidden = !showBase;
     priceBaseRow.style.display = showBase ? "" : "none";
   }
   if (priceHpHcRow) {
     priceHpHcRow.classList.toggle("hidden", showBase);
+    priceHpHcRow.hidden = showBase;
     priceHpHcRow.style.display = showBase ? "none" : "";
   }
   if (priceBase) {
@@ -248,6 +280,7 @@ function updatePriceFields() {
 }
 
 priceMode?.addEventListener("change", updatePriceFields);
+priceMode?.addEventListener("input", updatePriceFields);
 
 function addForbiddenRow(data = {}) {
   const row = document.createElement("div");
@@ -367,14 +400,13 @@ function buildAssistantFromForm() {
     driverConfig[input.name] = normalizeFieldValue(input);
   });
 
-  const rawPriceModeValue = priceMode?.value || "BASE";
-  const priceModeValue = rawPriceModeValue === "BASE" ? "BASE" : "HPHC";
-  const prices = { mode: priceModeValue, resell_price: Number(priceResell.value) };
+  const priceModeValue = normalizePriceMode(priceMode?.value, "BASE");
+  const prices = { mode: priceModeValue, resell_price: parseDecimalInput(priceResell, 0.06) };
   if (priceModeValue === "HPHC") {
-    prices.hp_price = Number(priceHp.value);
-    prices.hc_price = Number(priceHc.value);
+    prices.hp_price = parseDecimalInput(priceHp, 0.22);
+    prices.hc_price = parseDecimalInput(priceHc, 0.14);
   } else {
-    prices.base_price = Number(priceBase.value);
+    prices.base_price = parseDecimalInput(priceBase, 0.18);
   }
 
   const forbidden = Array.from(forbiddenList?.querySelectorAll(".list-row") || [])
@@ -425,7 +457,7 @@ function buildAssistantFromForm() {
       constraints: {
         min_temp: Number(document.querySelector("#min-temp").value),
         forbidden_slots: forbidden,
-        background_noise: Number(backgroundNoise?.value || 250.0),
+        background_noise: parseDecimalInput(backgroundNoise, 250.0),
       },
       planning,
     },
@@ -472,9 +504,8 @@ function fillFormFromClient(client) {
   document.querySelector("#pv-rendement").value = weather.installation?.rendement_global ?? 0.18;
 
   const prices = engine.prices || {};
-  const storedPriceMode = prices.mode === "BASE" ? "BASE" : "HPHC";
-  const hasHpHcPrices = prices.hp_price != null || prices.hc_price != null;
-  priceMode.value = storedPriceMode === "BASE" && hasHpHcPrices ? "HPHC" : storedPriceMode;
+  const storedPriceMode = inferPriceMode(prices);
+  priceMode.value = storedPriceMode;
   priceBase.value = prices.base_price ?? 0.18;
   priceHp.value = prices.hp_price ?? 0.22;
   priceHc.value = prices.hc_price ?? 0.14;
