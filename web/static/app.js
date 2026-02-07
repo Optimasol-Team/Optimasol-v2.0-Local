@@ -225,8 +225,16 @@ driverSelect?.addEventListener("change", () => {
 function updatePriceFields() {
   if (!priceMode) return;
   const isHpHc = priceMode.value !== "BASE";
-  priceBaseRow?.classList.toggle("hidden", isHpHc);
-  priceHpHcRow?.classList.toggle("hidden", !isHpHc);
+  const showBase = !isHpHc;
+  // Toggle both class and inline display to avoid stale styles.
+  if (priceBaseRow) {
+    priceBaseRow.classList.toggle("hidden", !showBase);
+    priceBaseRow.style.display = showBase ? "" : "none";
+  }
+  if (priceHpHcRow) {
+    priceHpHcRow.classList.toggle("hidden", showBase);
+    priceHpHcRow.style.display = showBase ? "none" : "";
+  }
   if (priceBase) {
     priceBase.required = !isHpHc;
     priceBase.disabled = isHpHc;
