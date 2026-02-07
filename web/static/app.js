@@ -224,7 +224,7 @@ driverSelect?.addEventListener("change", () => {
 
 function updatePriceFields() {
   if (!priceMode) return;
-  const isHpHc = priceMode.value === "HPHC" || priceMode.value === "HC_HP";
+  const isHpHc = priceMode.value !== "BASE";
   priceBaseRow?.classList.toggle("hidden", isHpHc);
   priceHpHcRow?.classList.toggle("hidden", !isHpHc);
   if (priceBase) {
@@ -360,7 +360,7 @@ function buildAssistantFromForm() {
   });
 
   const rawPriceModeValue = priceMode?.value || "BASE";
-  const priceModeValue = rawPriceModeValue === "HC_HP" ? "HPHC" : rawPriceModeValue;
+  const priceModeValue = rawPriceModeValue === "BASE" ? "BASE" : "HPHC";
   const prices = { mode: priceModeValue, resell_price: Number(priceResell.value) };
   if (priceModeValue === "HPHC") {
     prices.hp_price = Number(priceHp.value);
@@ -464,8 +464,9 @@ function fillFormFromClient(client) {
   document.querySelector("#pv-rendement").value = weather.installation?.rendement_global ?? 0.18;
 
   const prices = engine.prices || {};
-  const storedPriceMode = prices.mode === "HC_HP" ? "HPHC" : (prices.mode || "BASE");
-  priceMode.value = storedPriceMode;
+  const storedPriceMode = prices.mode === "BASE" ? "BASE" : "HPHC";
+  const hasHpHcPrices = prices.hp_price != null || prices.hc_price != null;
+  priceMode.value = storedPriceMode === "BASE" && hasHpHcPrices ? "HPHC" : storedPriceMode;
   priceBase.value = prices.base_price ?? 0.18;
   priceHp.value = prices.hp_price ?? 0.22;
   priceHc.value = prices.hc_price ?? 0.14;
