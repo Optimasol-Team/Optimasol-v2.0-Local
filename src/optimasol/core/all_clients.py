@@ -279,6 +279,36 @@ class AllClients:
         panda_df = self.weather_infos[leader_id]
         converter = Converter()
         productions = converter.convert(panda_df, client.client_weather)
+
+        # Normalise output for optimiser_engine: datetime index only (no mixed int/Timestamp index).
+        if isinstance(productions, pd.DataFrame):
+            if "Datetime" in productions.columns:
+                productions = productions.copy()
+                productions["Datetime"] = pd.to_datetime(
+                    productions["Datetime"], utc=True, errors="coerce"
+                )
+                productions = productions.dropna(subset=["Datetime"]).set_index("Datetime")
+            elif not isinstance(productions.index, pd.DatetimeIndex):
+                idx = pd.to_datetime(productions.index, utc=True, errors="coerce")
+                if getattr(idx, "notna", None) is not None:
+                    mask = idx.notna()
+                    productions = productions.loc[mask].copy()
+                    idx = idx[mask]
+                productions.index = idx
+
+            if isinstance(productions.index, pd.DatetimeIndex):
+                if productions.index.tz is None:
+                    productions.index = productions.index.tz_localize("UTC")
+                else:
+                    productions.index = productions.index.tz_convert("UTC")
+                productions = productions.sort_index()
+
+            if "production" in productions.columns:
+                productions["production"] = pd.to_numeric(
+                    productions["production"], errors="coerce"
+                )
+                productions = productions.dropna(subset=["production"])
+
         client.production_forecast = productions
         logger.debug("Production forecast updated successfully for client %s", client.client_id) 
         
