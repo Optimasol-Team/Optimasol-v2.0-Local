@@ -54,7 +54,7 @@ class Reporter:
         """
         ts = time.isoformat() if hasattr(time, "isoformat") else str(time)
         query = "INSERT OR REPLACE INTO Productions (id, timestamp, production) VALUES (?, ?, ?)"
-        self.db_manager.execute_commit(query, (client_id, production_forecast, ts))
+        self.db_manager.execute_commit(query, (client_id, ts, production_forecast))
     
     def report_production_measured(self, client_id: int, production_measured: float, time: str) -> None:
         """

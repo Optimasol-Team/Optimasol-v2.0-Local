@@ -182,7 +182,7 @@ class Client:
             Uses class-level HORIZON_HOURS and STEP_MINUTES for optimization parameters.
         """
         logger.info("Optimisation: appel solveur pour client %s", self.client_id)
-        now = datetime.now() 
+        now = datetime.now(timezone.utc)
         service = OptimizerService(Client.HORIZON_HOURS, Client.STEP_MINUTES) 
 
         trajectory = service.trajectory_of_client(self.client_engine, now, self.last_temperature, self.production_forecast) 

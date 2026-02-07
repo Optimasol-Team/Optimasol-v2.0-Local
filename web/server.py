@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 import smtplib
+from collections import deque
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -20,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, validator
 
 from optimasol.database import DBManager
-from optimasol.default import DEFAULT_DB_PATH, PID_FILE, PROJECT_ROOT
+from optimasol.default import DEFAULT_DB_PATH, LOG_FILE, PID_FILE, PROJECT_ROOT
 from optimasol.logging_setup import setup_logging
 from optimasol.config_loader import load_config_file
 from optimasol.core import AllClients
@@ -570,6 +571,64 @@ def _last_df_timestamp(df) -> Optional[datetime]:
         return None
 
 
+def _parse_log_ts(line: str) -> Optional[datetime]:
+    try:
+        # Format attendu: "YYYY-MM-DD HH:MM:SS | ..."
+        stamp = line[:19]
+        dt = datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S")
+        return dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _tail_lines(path: Path, limit: int = 4000) -> List[str]:
+    try:
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8", errors="ignore") as fh:
+            return list(deque(fh, maxlen=limit))
+    except Exception:
+        return []
+
+
+def _driver_state_from_logs(serial: Optional[str]) -> Dict[str, Optional[str]]:
+    if not serial:
+        return {"state": None, "event_at": None}
+
+    log_paths = [
+        LOG_FILE,
+        Path(str(LOG_FILE) + ".1"),
+        Path(str(LOG_FILE) + ".2"),
+    ]
+    all_lines: List[str] = []
+    for path in log_paths:
+        all_lines.extend(_tail_lines(path, limit=2500))
+
+    for line in reversed(all_lines):
+        if serial not in line:
+            continue
+
+        line_l = line.lower()
+        ts = _parse_log_ts(line)
+        ts_iso = ts.isoformat() if ts else None
+
+        # "Activé" = connexion broker réussie + écoute active (subscribe OK).
+        if "subscription to" in line_l and "successful" in line_l:
+            return {"state": "activated", "event_at": ts_iso}
+        if "successfully connected to mqtt broker" in line_l:
+            return {"state": "activated", "event_at": ts_iso}
+
+        # "Échec" = déconnexion ou échec de connexion broker.
+        if "disconnected from mqtt broker" in line_l:
+            return {"state": "failed", "event_at": ts_iso}
+        if "connection failed with return code" in line_l:
+            return {"state": "failed", "event_at": ts_iso}
+        if "initial connection failed" in line_l:
+            return {"state": "failed", "event_at": ts_iso}
+
+    return {"state": None, "event_at": None}
+
+
 # -------- Pydantic Models ----------
 
 
@@ -1027,36 +1086,47 @@ def home_status(req: Request):
     pid = _read_service_pid()
     process_running = _is_process_alive(pid)
 
-    temp_ts = _last_df_timestamp(db.getter.get_temperatures(client_id, 1))
-    prod_ts = _last_df_timestamp(db.getter.get_production_measured(client_id, 1))
+    serial = None
+    try:
+        cfg_row = db.execute_query("SELECT config_driver FROM users_main WHERE id = ?", (client_id,))
+        if cfg_row:
+            cfg_driver = json.loads(cfg_row[0][0]) if cfg_row[0][0] else {}
+            if isinstance(cfg_driver, dict):
+                serial = cfg_driver.get("serial_number")
+    except Exception:
+        serial = None
 
+    broker_event = _driver_state_from_logs(str(serial) if serial else None)
+
+    # Dernier message routeur reçu (information affichée uniquement, pas utilisée pour le statut).
+    temp_ts = None
+    prod_ts = None
     power_ts = None
     try:
-        power_row = db.execute_query(
-            "SELECT timestamp FROM decisions_measurements WHERE id = ? ORDER BY timestamp DESC LIMIT 1",
-            (client_id,),
-        )
-        if power_row:
+        temp_row = db.execute_query("SELECT MAX(timestamp) FROM temperatures WHERE id = ?", (client_id,))
+        prod_row = db.execute_query("SELECT MAX(timestamp) FROM productions_measurements WHERE id = ?", (client_id,))
+        power_row = db.execute_query("SELECT MAX(timestamp) FROM decisions_measurements WHERE id = ?", (client_id,))
+
+        if temp_row and temp_row[0][0]:
+            temp_ts = _parse_dt(str(temp_row[0][0]))
+        if prod_row and prod_row[0][0]:
+            prod_ts = _parse_dt(str(prod_row[0][0]))
+        if power_row and power_row[0][0]:
             power_ts = _parse_dt(str(power_row[0][0]))
     except Exception:
-        power_ts = None
+        pass
 
     timestamps = [ts for ts in [temp_ts, prod_ts, power_ts] if ts is not None]
-    latest_driver_data = max(timestamps) if timestamps else None
-    age_seconds = int((now_utc - latest_driver_data).total_seconds()) if latest_driver_data else None
+    last_router_message = max(timestamps) if timestamps else None
 
-    freshness_window_seconds = 300
     if not process_running:
-        driver_state = "process_stopped"
+        driver_state = "process_disabled"
         broker_connected = None
-    elif latest_driver_data is None:
-        driver_state = "unknown"
-        broker_connected = False
-    elif age_seconds is not None and age_seconds <= freshness_window_seconds:
-        driver_state = "connected"
+    elif broker_event.get("state") == "activated":
+        driver_state = "activated"
         broker_connected = True
     else:
-        driver_state = "disconnected"
+        driver_state = "failed"
         broker_connected = False
 
     return {
@@ -1068,12 +1138,12 @@ def home_status(req: Request):
         "driver": {
             "state": driver_state,
             "broker_connected": broker_connected,
-            "last_data_at": latest_driver_data.isoformat() if latest_driver_data else None,
+            "serial_number": serial,
+            "last_message_at": last_router_message.isoformat() if last_router_message else None,
+            "last_broker_event_at": broker_event.get("event_at"),
             "last_temperature_at": temp_ts.isoformat() if temp_ts else None,
             "last_production_at": prod_ts.isoformat() if prod_ts else None,
             "last_power_at": power_ts.isoformat() if power_ts else None,
-            "age_seconds": age_seconds,
-            "freshness_window_seconds": freshness_window_seconds,
         },
     }
 

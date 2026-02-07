@@ -64,14 +64,14 @@ const panelHome = document.querySelector("#panel-home");
 const panelHistory = document.querySelector("#panel-history");
 const panelSecurity = document.querySelector("#panel-security");
 
-const processStatusPill = document.querySelector("#process-status-pill");
-const processStatusText = document.querySelector("#process-status-text");
-const driverStatusPill = document.querySelector("#driver-status-pill");
-const driverStatusText = document.querySelector("#driver-status-text");
-const driverLastText = document.querySelector("#driver-last-text");
-const forecastTodayChart = document.querySelector("#forecast-today-chart");
-const forecastTodayEmpty = document.querySelector("#forecast-today-empty");
-const forecastUpdatedAt = document.querySelector("#forecast-updated-at");
+let processStatusPill = document.querySelector("#process-status-pill");
+let processStatusText = document.querySelector("#process-status-text");
+let driverStatusPill = document.querySelector("#driver-status-pill");
+let driverStatusText = document.querySelector("#driver-status-text");
+let driverLastText = document.querySelector("#driver-last-text");
+let forecastTodayChart = document.querySelector("#forecast-today-chart");
+let forecastTodayEmpty = document.querySelector("#forecast-today-empty");
+let forecastUpdatedAt = document.querySelector("#forecast-updated-at");
 
 let dashboardRefreshTimer = null;
 const DASHBOARD_REFRESH_MS = 15_000;
@@ -137,6 +137,58 @@ function showApp() {
   } else {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+}
+
+function ensureHomeBlocks() {
+  if (processStatusPill && driverStatusPill && forecastTodayChart) return;
+  if (!panelHome || !summaryBox) return;
+
+  const existing = panelHome.querySelector("#home-extra-blocks");
+  if (existing) {
+    processStatusPill = document.querySelector("#process-status-pill");
+    processStatusText = document.querySelector("#process-status-text");
+    driverStatusPill = document.querySelector("#driver-status-pill");
+    driverStatusText = document.querySelector("#driver-status-text");
+    driverLastText = document.querySelector("#driver-last-text");
+    forecastTodayChart = document.querySelector("#forecast-today-chart");
+    forecastTodayEmpty = document.querySelector("#forecast-today-empty");
+    forecastUpdatedAt = document.querySelector("#forecast-updated-at");
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.id = "home-extra-blocks";
+  wrapper.innerHTML = `
+    <div class="home-grid">
+      <div class="home-card">
+        <h3>État du processus</h3>
+        <div id="process-status-pill" class="status-pill status-unknown">Inconnu</div>
+        <div id="process-status-text" class="muted home-note"></div>
+      </div>
+      <div class="home-card">
+        <h3>État du driver</h3>
+        <div id="driver-status-pill" class="status-pill status-unknown">Inconnu</div>
+        <div id="driver-status-text" class="muted home-note"></div>
+        <div id="driver-last-text" class="muted"></div>
+      </div>
+    </div>
+    <div class="home-card">
+      <h3>Production solaire prévue (aujourd'hui)</h3>
+      <canvas id="forecast-today-chart" height="220"></canvas>
+      <div id="forecast-today-empty" class="muted hidden"></div>
+      <div id="forecast-updated-at" class="muted"></div>
+    </div>
+  `;
+  summaryBox.insertAdjacentElement("afterend", wrapper);
+
+  processStatusPill = document.querySelector("#process-status-pill");
+  processStatusText = document.querySelector("#process-status-text");
+  driverStatusPill = document.querySelector("#driver-status-pill");
+  driverStatusText = document.querySelector("#driver-status-text");
+  driverLastText = document.querySelector("#driver-last-text");
+  forecastTodayChart = document.querySelector("#forecast-today-chart");
+  forecastTodayEmpty = document.querySelector("#forecast-today-empty");
+  forecastUpdatedAt = document.querySelector("#forecast-updated-at");
 }
 
 function normalizeFieldValue(input) {
@@ -911,36 +963,24 @@ function renderProcessStatus(data = {}) {
 }
 
 function renderDriverStatus(process = {}, driver = {}) {
-  if (!process.running) {
-    setBadgeState(driverStatusPill, "status-warning", "Indéterminé");
-    driverStatusText.textContent =
-      "Processus arrêté: l'état de connexion au broker/driver ne peut pas être évalué.";
-  } else if (driver.state === "connected") {
-    setBadgeState(driverStatusPill, "status-connected", "Connecté");
-    driverStatusText.textContent = "Connexion broker/driver active.";
-  } else if (driver.state === "disconnected") {
-    setBadgeState(driverStatusPill, "status-disconnected", "Déconnecté");
-    driverStatusText.textContent = "Aucune donnée récente du driver (connexion broker probable absente).";
+  if (!process.running || driver.state === "process_disabled") {
+    setBadgeState(driverStatusPill, "status-warning", "Processus désactivé");
+    driverStatusText.textContent = "Processus arrêté: état broker non évalué.";
+  } else if (driver.state === "activated") {
+    setBadgeState(driverStatusPill, "status-connected", "Activé");
+    driverStatusText.textContent = "Connexion broker réussie et écoute active.";
   } else {
-    setBadgeState(driverStatusPill, "status-unknown", "Inconnu");
-    driverStatusText.textContent = "Aucune donnée driver exploitable pour l'instant.";
+    setBadgeState(driverStatusPill, "status-disconnected", "Échec");
+    driverStatusText.textContent = "Connexion broker échouée.";
   }
 
   if (!driverLastText) return;
-  const last = driver.last_data_at;
-  if (!last) {
-    driverLastText.textContent = "Dernière donnée driver: —";
-    return;
-  }
-
-  const parts = [`Dernière donnée driver reçue le ${formatDateTime(last)}.`];
-  if (Number.isFinite(driver.age_seconds)) {
-    parts.push(`Âge des données: ${driver.age_seconds}s.`);
-  }
-  driverLastText.textContent = parts.join(" ");
+  const last = driver.last_message_at;
+  driverLastText.textContent = `Dernier message reçu du routeur: ${formatTimeHHMM(last)}`;
 }
 
 async function loadHomeStatus() {
+  ensureHomeBlocks();
   try {
     const res = await api("/api/home/status");
     renderProcessStatus(res.process || {});
@@ -955,6 +995,7 @@ async function loadHomeStatus() {
 }
 
 async function loadTodayForecast() {
+  ensureHomeBlocks();
   try {
     const res = await api("/api/home/forecast/today");
     const points = res.points || [];
@@ -1049,11 +1090,13 @@ function startDashboardRefresh() {
 async function loadDashboard() {
   await loadMe();
   showApp();
+  ensureHomeBlocks();
   await Promise.allSettled([loadClient(), refreshHomePanel()]);
   startDashboardRefresh();
 }
 
 async function bootstrap() {
+  ensureHomeBlocks();
   const storedToken = localStorage.getItem("optimasol_token");
   const storedSignup = localStorage.getItem("optimasol_signup");
   if (storedToken) {
