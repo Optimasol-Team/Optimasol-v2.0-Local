@@ -14,6 +14,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -42,6 +43,9 @@ app.add_middleware(
 WEB_ROOT = PROJECT_ROOT / "web"
 STATIC_DIR = WEB_ROOT / "static"
 TEMPLATE_INDEX = WEB_ROOT / "templates" / "index.html"
+
+FORECAST_CACHE_TTL_SECONDS = 300
+_FORECAST_TODAY_CACHE: Dict[int, Dict[str, Any]] = {}
 
 
 # -------- Helpers ----------
@@ -629,6 +633,109 @@ def _driver_state_from_logs(serial: Optional[str]) -> Dict[str, Optional[str]]:
     return {"state": None, "event_at": None}
 
 
+def _latest_power_measured(db: DBManager, client_id: int) -> Optional[dict]:
+    try:
+        rows = db.execute_query(
+            """
+            SELECT decision, timestamp
+            FROM decisions_measurements
+            WHERE id = ?
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (client_id,),
+        )
+        if not rows:
+            return None
+        value, ts = rows[0]
+        return {"value": value, "timestamp": str(ts) if ts is not None else None}
+    except Exception:
+        return None
+
+
+def _build_today_forecast_points(client_id: int, db: DBManager) -> List[Dict[str, Any]]:
+    from weather_manager import Client as WeatherClient
+    from weather_manager.get_forecasts import get_forecast_for_client
+    from weather_manager.irradiance_converter.converter import Converter
+
+    cfg_rows = db.execute_query("SELECT config_weather FROM users_main WHERE id = ?", (client_id,))
+    if not cfg_rows:
+        return []
+
+    cfg_weather = json.loads(cfg_rows[0][0]) if cfg_rows[0][0] else {}
+    weather_client = WeatherClient.from_dict(cfg_weather)
+    weather_client.client_id = client_id
+
+    now_local = datetime.now().astimezone()
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_local = start_local + timedelta(days=1)
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+
+    # On récupère une fenêtre > 24h pour garantir la couverture de la journée locale.
+    forecast_start = start_local.date()
+    forecast_end = (end_local + timedelta(days=1)).date()
+    forecast_df = get_forecast_for_client(weather_client, forecast_start, forecast_end)
+    production_df = Converter().convert(forecast_df, weather_client)
+
+    if production_df is None or production_df.empty:
+        return []
+
+    if "Datetime" in production_df.columns:
+        dt_series = pd.to_datetime(production_df["Datetime"], utc=True, errors="coerce")
+    else:
+        dt_series = pd.to_datetime(production_df.index, utc=True, errors="coerce")
+
+    if "production" in production_df.columns:
+        prod_series = pd.to_numeric(production_df["production"], errors="coerce")
+    else:
+        first_col = production_df.columns[0]
+        prod_series = pd.to_numeric(production_df[first_col], errors="coerce")
+
+    points: List[Dict[str, Any]] = []
+    for ts, prod in zip(dt_series.tolist(), prod_series.tolist()):
+        if pd.isna(ts) or pd.isna(prod):
+            continue
+        ts_py = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        ts_utc = ts_py.astimezone(timezone.utc) if ts_py.tzinfo else ts_py.replace(tzinfo=timezone.utc)
+        if ts_utc < start_utc or ts_utc >= end_utc:
+            continue
+        points.append({"timestamp": ts_utc.isoformat(), "production": float(prod)})
+
+    points.sort(key=lambda x: x["timestamp"])
+    return points
+
+
+def _build_today_forecast_from_db(client_id: int, db: DBManager) -> List[Dict[str, Any]]:
+    now_local = datetime.now().astimezone()
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_local = start_local + timedelta(days=1)
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+
+    rows = db.execute_query(
+        """
+        SELECT timestamp, production
+        FROM Productions
+        WHERE id = ? AND timestamp >= ? AND timestamp < ?
+        ORDER BY timestamp ASC
+        """,
+        (client_id, start_utc.isoformat(), end_utc.isoformat()),
+    )
+
+    points: List[Dict[str, Any]] = []
+    for ts_raw, production_raw in rows:
+        ts = _parse_dt(str(ts_raw))
+        if ts is None:
+            continue
+        try:
+            production = float(production_raw)
+        except Exception:
+            continue
+        points.append({"timestamp": ts.astimezone(timezone.utc).isoformat(), "production": production})
+    return points
+
+
 # -------- Pydantic Models ----------
 
 
@@ -1160,30 +1267,29 @@ def home_forecast_today(req: Request):
     end_local = start_local + timedelta(days=1)
     start_utc = start_local.astimezone(timezone.utc)
     end_utc = end_local.astimezone(timezone.utc)
+    cache_key = client_id
+    cache_entry = _FORECAST_TODAY_CACHE.get(cache_key)
+    points: List[Dict[str, Any]] = []
+    if cache_entry:
+        cached_at = cache_entry.get("cached_at")
+        cached_date = cache_entry.get("date_local")
+        age = (datetime.now(timezone.utc) - cached_at).total_seconds() if isinstance(cached_at, datetime) else None
+        if cached_date == str(start_local.date()) and age is not None and age <= FORECAST_CACHE_TTL_SECONDS:
+            points = cache_entry.get("points", [])
 
-    rows = db.execute_query(
-        """
-        SELECT timestamp, production
-        FROM Productions
-        WHERE id = ? AND timestamp >= ? AND timestamp < ?
-        ORDER BY timestamp ASC
-        """,
-        (client_id, start_utc.isoformat(), end_utc.isoformat()),
-    )
-
-    points = []
-    last_forecast_point = None
-    for ts_raw, production_raw in rows:
-        ts = _parse_dt(str(ts_raw))
-        if ts is None:
-            continue
-        ts_utc = ts.astimezone(timezone.utc)
+    if not points:
         try:
-            production = float(production_raw)
+            points = _build_today_forecast_points(client_id, db)
         except Exception:
-            continue
-        points.append({"timestamp": ts_utc.isoformat(), "production": production})
-        last_forecast_point = ts_utc
+            # Fallback BDD pour rester robuste si la chaîne météo/PV échoue.
+            points = _build_today_forecast_from_db(client_id, db)
+        _FORECAST_TODAY_CACHE[cache_key] = {
+            "cached_at": datetime.now(timezone.utc),
+            "date_local": str(start_local.date()),
+            "points": points,
+        }
+
+    last_forecast_point = _parse_dt(points[-1]["timestamp"]) if points else None
 
     return {
         "date_local": str(start_local.date()),
@@ -1238,12 +1344,13 @@ def summary(req: Request):
     client_id = db.execute_query("SELECT client_id FROM users_auth WHERE id=?", (user_id,))[0][0]
     temp_df = db.getter.get_temperatures(client_id, 1)
     prod_df = db.getter.get_production_measured(client_id, 1)
-    forecast_df = db.getter.get_production_forecast(client_id, 1)
     decision_df = db.getter.get_decisions(client_id, 1)
+    power_measured = _latest_power_measured(db, client_id)
     return {
         "temperature": _last_df_value(temp_df, "temperature"),
         "production_measured": _last_df_value(prod_df, "production"),
-        "production_forecast": _last_df_value(forecast_df, "production"),
+        "power_water_heater": power_measured,
+        "production_forecast": None,
         "decision": _last_df_value(decision_df, "decision"),
     }
 

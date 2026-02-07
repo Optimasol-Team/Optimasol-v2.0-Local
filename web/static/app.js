@@ -924,6 +924,30 @@ function drawForecastTodayChart(points) {
     return;
   }
 
+  if (normalizedPoints.length === 1) {
+    const value = Number(normalizedPoints[0].production);
+    const maxScale = Math.max(value, 1);
+    const y = height - (value / maxScale) * (height - 28) - 14;
+    ctx.strokeStyle = "#16a34a";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, y);
+    ctx.lineTo(width - 10, y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#16a34a";
+    ctx.beginPath();
+    ctx.arc(width / 2, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "12px IBM Plex Sans";
+    const label = formatTimeHHMM(normalizedPoints[0]?.timestamp);
+    ctx.fillText(label, 8, height - 4);
+    ctx.fillText(label, Math.max(width - 52, 8), height - 4);
+    return;
+  }
+
   const values = normalizedPoints.map((p) => Number(p.production));
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
@@ -1058,7 +1082,7 @@ async function loadSummary() {
   const items = [
     { label: "Température", data: res.temperature },
     { label: "Production mesurée", data: res.production_measured },
-    { label: "Dernière décision", data: res.decision },
+    { label: "Puissance chauffe-eau", data: res.power_water_heater || res.decision },
   ];
   summaryBox.innerHTML = items
     .map((item) => {
