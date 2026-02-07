@@ -48,6 +48,24 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _static_version() -> str:
+    paths = [
+        STATIC_DIR / "app.js",
+        STATIC_DIR / "style.css",
+        TEMPLATE_INDEX,
+    ]
+    mtimes = []
+    for path in paths:
+        try:
+            if path.exists():
+                mtimes.append(int(path.stat().st_mtime))
+        except Exception:
+            continue
+    if not mtimes:
+        return "0"
+    return str(max(mtimes))
+
+
 def _hash_password(password: str, salt: str | None = None) -> str:
     salt = salt or secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
@@ -603,7 +621,13 @@ class PasswordChangePayload(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return FileResponse(TEMPLATE_INDEX)
+    if not TEMPLATE_INDEX.exists():
+        raise HTTPException(404, "Template introuvable")
+    html = TEMPLATE_INDEX.read_text(encoding="utf-8")
+    html = html.replace("__STATIC_VERSION__", _static_version())
+    response = HTMLResponse(html)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/api/drivers")
