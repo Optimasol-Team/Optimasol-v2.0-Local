@@ -214,6 +214,28 @@
             <h2>Accueil</h2>
             <p class="muted">Vue générale de votre installation.</p>
             <div id="summary" class="summary-grid"></div>
+
+            <div class="home-grid">
+              <div class="home-card">
+                <h3>État du processus</h3>
+                <div id="process-status-pill" class="status-pill status-unknown">Inconnu</div>
+                <div id="process-status-text" class="muted home-note"></div>
+              </div>
+
+              <div class="home-card">
+                <h3>État du driver</h3>
+                <div id="driver-status-pill" class="status-pill status-unknown">Inconnu</div>
+                <div id="driver-status-text" class="muted home-note"></div>
+                <div id="driver-last-text" class="muted"></div>
+              </div>
+            </div>
+
+            <div class="home-card">
+              <h3>Production solaire prévue (aujourd'hui)</h3>
+              <canvas id="forecast-today-chart" height="220"></canvas>
+              <div id="forecast-today-empty" class="muted hidden"></div>
+              <div id="forecast-updated-at" class="muted"></div>
+            </div>
           </section>
 
           <section id="panel-history" class="panel hidden">

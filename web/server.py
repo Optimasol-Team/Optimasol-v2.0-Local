@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import smtplib
 from copy import deepcopy
@@ -14,12 +15,12 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, validator
 
 from optimasol.database import DBManager
-from optimasol.default import DEFAULT_DB_PATH, PROJECT_ROOT
+from optimasol.default import DEFAULT_DB_PATH, PID_FILE, PROJECT_ROOT
 from optimasol.logging_setup import setup_logging
 from optimasol.config_loader import load_config_file
 from optimasol.core import AllClients
@@ -525,10 +526,46 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
     if not value:
         return None
     try:
-        dt = datetime.fromisoformat(value)
+        raw = value.strip()
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
+    except Exception:
+        return None
+
+
+def _read_service_pid() -> Optional[int]:
+    try:
+        if not PID_FILE.exists():
+            return None
+        return int(PID_FILE.read_text().strip())
+    except Exception:
+        return None
+
+
+def _is_process_alive(pid: Optional[int]) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _last_df_timestamp(df) -> Optional[datetime]:
+    try:
+        if df is None or df.empty:
+            return None
+        ts = df.tail(1).index[-1]
+        if isinstance(ts, datetime):
+            if ts.tzinfo is None:
+                return ts.replace(tzinfo=timezone.utc)
+            return ts
+        return _parse_dt(str(ts))
     except Exception:
         return None
 
@@ -978,6 +1015,115 @@ def update_client(req: Request, payload: ClientUpdatePayload):
 
     db.client_manager.store_all_clients(all_clients)
     return {"status": "ok"}
+
+
+@app.get("/api/home/status")
+def home_status(req: Request):
+    db = _db()
+    user_id = _require_session(req, db)
+    client_id = db.execute_query("SELECT client_id FROM users_auth WHERE id=?", (user_id,))[0][0]
+
+    now_utc = datetime.now(timezone.utc)
+    pid = _read_service_pid()
+    process_running = _is_process_alive(pid)
+
+    temp_ts = _last_df_timestamp(db.getter.get_temperatures(client_id, 1))
+    prod_ts = _last_df_timestamp(db.getter.get_production_measured(client_id, 1))
+
+    power_ts = None
+    try:
+        power_row = db.execute_query(
+            "SELECT timestamp FROM decisions_measurements WHERE id = ? ORDER BY timestamp DESC LIMIT 1",
+            (client_id,),
+        )
+        if power_row:
+            power_ts = _parse_dt(str(power_row[0][0]))
+    except Exception:
+        power_ts = None
+
+    timestamps = [ts for ts in [temp_ts, prod_ts, power_ts] if ts is not None]
+    latest_driver_data = max(timestamps) if timestamps else None
+    age_seconds = int((now_utc - latest_driver_data).total_seconds()) if latest_driver_data else None
+
+    freshness_window_seconds = 300
+    if not process_running:
+        driver_state = "process_stopped"
+        broker_connected = None
+    elif latest_driver_data is None:
+        driver_state = "unknown"
+        broker_connected = False
+    elif age_seconds is not None and age_seconds <= freshness_window_seconds:
+        driver_state = "connected"
+        broker_connected = True
+    else:
+        driver_state = "disconnected"
+        broker_connected = False
+
+    return {
+        "process": {
+            "running": process_running,
+            "pid": pid,
+            "checked_at": now_utc.isoformat(),
+        },
+        "driver": {
+            "state": driver_state,
+            "broker_connected": broker_connected,
+            "last_data_at": latest_driver_data.isoformat() if latest_driver_data else None,
+            "last_temperature_at": temp_ts.isoformat() if temp_ts else None,
+            "last_production_at": prod_ts.isoformat() if prod_ts else None,
+            "last_power_at": power_ts.isoformat() if power_ts else None,
+            "age_seconds": age_seconds,
+            "freshness_window_seconds": freshness_window_seconds,
+        },
+    }
+
+
+@app.get("/api/home/forecast/today")
+def home_forecast_today(req: Request):
+    db = _db()
+    user_id = _require_session(req, db)
+    client_id = db.execute_query("SELECT client_id FROM users_auth WHERE id=?", (user_id,))[0][0]
+
+    now_local = datetime.now().astimezone()
+    tz_local = now_local.tzinfo or timezone.utc
+    start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_local = start_local + timedelta(days=1)
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+
+    rows = db.execute_query(
+        """
+        SELECT timestamp, production
+        FROM Productions
+        WHERE id = ? AND timestamp >= ? AND timestamp < ?
+        ORDER BY timestamp ASC
+        """,
+        (client_id, start_utc.isoformat(), end_utc.isoformat()),
+    )
+
+    points = []
+    last_forecast_point = None
+    for ts_raw, production_raw in rows:
+        ts = _parse_dt(str(ts_raw))
+        if ts is None:
+            continue
+        ts_utc = ts.astimezone(timezone.utc)
+        try:
+            production = float(production_raw)
+        except Exception:
+            continue
+        points.append({"timestamp": ts_utc.isoformat(), "production": production})
+        last_forecast_point = ts_utc
+
+    return {
+        "date_local": str(start_local.date()),
+        "timezone": str(tz_local),
+        "start_utc": start_utc.isoformat(),
+        "end_utc": end_utc.isoformat(),
+        "points": points,
+        "last_forecast_point_at": last_forecast_point.isoformat() if last_forecast_point else None,
+        "refreshed_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/api/history")

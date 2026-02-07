@@ -64,6 +64,18 @@ const panelHome = document.querySelector("#panel-home");
 const panelHistory = document.querySelector("#panel-history");
 const panelSecurity = document.querySelector("#panel-security");
 
+const processStatusPill = document.querySelector("#process-status-pill");
+const processStatusText = document.querySelector("#process-status-text");
+const driverStatusPill = document.querySelector("#driver-status-pill");
+const driverStatusText = document.querySelector("#driver-status-text");
+const driverLastText = document.querySelector("#driver-last-text");
+const forecastTodayChart = document.querySelector("#forecast-today-chart");
+const forecastTodayEmpty = document.querySelector("#forecast-today-empty");
+const forecastUpdatedAt = document.querySelector("#forecast-updated-at");
+
+let dashboardRefreshTimer = null;
+const DASHBOARD_REFRESH_MS = 15_000;
+
 function setStatus(el, message, ok = false) {
   if (!el) return;
   el.textContent = message || "";
@@ -160,6 +172,36 @@ function parseDecimalInput(input, fallback = 0) {
   const normalized = raw.replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseIsoDate(iso) {
+  if (!iso) return null;
+  const dt = new Date(iso);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatTimeHHMM(iso) {
+  const dt = parseIsoDate(iso);
+  if (!dt) return "—";
+  return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDateTime(iso) {
+  const dt = parseIsoDate(iso);
+  if (!dt) return "—";
+  return dt.toLocaleString([], {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function setBadgeState(el, stateClass, label) {
+  if (!el) return;
+  el.className = `status-pill ${stateClass}`;
+  el.textContent = label;
 }
 
 function renderDriverFields(def, values = {}) {
@@ -569,6 +611,7 @@ async function logout() {
   token = null;
   signupToken = null;
   currentClient = null;
+  stopDashboardRefresh();
   localStorage.removeItem("optimasol_token");
   localStorage.removeItem("optimasol_signup");
   userInfo.textContent = "";
@@ -812,6 +855,134 @@ function drawChart(canvas, points) {
   ctx.stroke();
 }
 
+function drawForecastTodayChart(points) {
+  if (!forecastTodayChart) return;
+  const ctx = forecastTodayChart.getContext("2d");
+  if (!ctx) return;
+
+  const width = forecastTodayChart.clientWidth;
+  const height = forecastTodayChart.height;
+  forecastTodayChart.width = width;
+  ctx.clearRect(0, 0, width, height);
+
+  const normalizedPoints = (points || []).filter((p) => Number.isFinite(Number(p.production)));
+  if (!normalizedPoints.length) {
+    ctx.fillStyle = "#6b7280";
+    ctx.fillText("Aucune prévision disponible pour aujourd'hui.", 10, 20);
+    return;
+  }
+
+  const values = normalizedPoints.map((p) => Number(p.production));
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const span = maxVal - minVal || 1;
+
+  ctx.strokeStyle = "#16a34a";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  normalizedPoints.forEach((point, idx) => {
+    const x = (idx / (normalizedPoints.length - 1 || 1)) * (width - 20) + 10;
+    const y = height - ((Number(point.production) - minVal) / span) * (height - 28) - 14;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "12px IBM Plex Sans";
+  const firstLabel = formatTimeHHMM(normalizedPoints[0]?.timestamp);
+  const lastLabel = formatTimeHHMM(normalizedPoints[normalizedPoints.length - 1]?.timestamp);
+  ctx.fillText(firstLabel, 8, height - 4);
+  const endX = Math.max(width - 52, 8);
+  ctx.fillText(lastLabel, endX, height - 4);
+}
+
+function renderProcessStatus(data = {}) {
+  const running = Boolean(data.running);
+  if (running) {
+    setBadgeState(processStatusPill, "status-running", "En marche");
+    processStatusText.textContent = data.pid
+      ? `Processus actif (PID ${data.pid}).`
+      : "Processus actif.";
+  } else {
+    setBadgeState(processStatusPill, "status-stopped", "Arrêté");
+    processStatusText.textContent = "Le processus Optimasol est arrêté.";
+  }
+}
+
+function renderDriverStatus(process = {}, driver = {}) {
+  if (!process.running) {
+    setBadgeState(driverStatusPill, "status-warning", "Indéterminé");
+    driverStatusText.textContent =
+      "Processus arrêté: l'état de connexion au broker/driver ne peut pas être évalué.";
+  } else if (driver.state === "connected") {
+    setBadgeState(driverStatusPill, "status-connected", "Connecté");
+    driverStatusText.textContent = "Connexion broker/driver active.";
+  } else if (driver.state === "disconnected") {
+    setBadgeState(driverStatusPill, "status-disconnected", "Déconnecté");
+    driverStatusText.textContent = "Aucune donnée récente du driver (connexion broker probable absente).";
+  } else {
+    setBadgeState(driverStatusPill, "status-unknown", "Inconnu");
+    driverStatusText.textContent = "Aucune donnée driver exploitable pour l'instant.";
+  }
+
+  if (!driverLastText) return;
+  const last = driver.last_data_at;
+  if (!last) {
+    driverLastText.textContent = "Dernière donnée driver: —";
+    return;
+  }
+
+  const parts = [`Dernière donnée driver reçue le ${formatDateTime(last)}.`];
+  if (Number.isFinite(driver.age_seconds)) {
+    parts.push(`Âge des données: ${driver.age_seconds}s.`);
+  }
+  driverLastText.textContent = parts.join(" ");
+}
+
+async function loadHomeStatus() {
+  try {
+    const res = await api("/api/home/status");
+    renderProcessStatus(res.process || {});
+    renderDriverStatus(res.process || {}, res.driver || {});
+  } catch (err) {
+    setBadgeState(processStatusPill, "status-unknown", "Inconnu");
+    setBadgeState(driverStatusPill, "status-unknown", "Inconnu");
+    if (processStatusText) processStatusText.textContent = "Échec du chargement de l'état du processus.";
+    if (driverStatusText) driverStatusText.textContent = "Échec du chargement de l'état du driver.";
+    if (driverLastText) driverLastText.textContent = "";
+  }
+}
+
+async function loadTodayForecast() {
+  try {
+    const res = await api("/api/home/forecast/today");
+    const points = res.points || [];
+    drawForecastTodayChart(points);
+
+    if (forecastTodayEmpty) {
+      forecastTodayEmpty.classList.toggle("hidden", points.length > 0);
+      forecastTodayEmpty.textContent = points.length
+        ? ""
+        : "Aucune prévision disponible pour aujourd'hui.";
+    }
+
+    if (forecastUpdatedAt) {
+      const updated = formatTimeHHMM(res.refreshed_at);
+      forecastUpdatedAt.textContent = `Dernière mise à jour: ${updated}`;
+    }
+  } catch (err) {
+    drawForecastTodayChart([]);
+    if (forecastTodayEmpty) {
+      forecastTodayEmpty.classList.remove("hidden");
+      forecastTodayEmpty.textContent = "Erreur de chargement des prévisions du jour.";
+    }
+    if (forecastUpdatedAt) {
+      forecastUpdatedAt.textContent = "";
+    }
+  }
+}
+
 async function loadHistoryRange() {
   try {
     const params = new URLSearchParams();
@@ -846,22 +1017,40 @@ async function loadSummary() {
   const items = [
     { label: "Température", data: res.temperature },
     { label: "Production mesurée", data: res.production_measured },
-    { label: "Production prévue", data: res.production_forecast },
     { label: "Dernière décision", data: res.decision },
   ];
   summaryBox.innerHTML = items
     .map((item) => {
       const value = item.data ? item.data.value : "—";
-      const ts = item.data ? item.data.timestamp : "";
+      const ts = item.data?.timestamp ? formatDateTime(item.data.timestamp) : "";
       return `<div class="summary-item"><div class="label">${item.label}</div><div class="value">${value}</div><div class="muted">${ts}</div></div>`;
     })
     .join("");
 }
 
+async function refreshHomePanel() {
+  await Promise.allSettled([loadSummary(), loadHomeStatus(), loadTodayForecast()]);
+}
+
+function stopDashboardRefresh() {
+  if (!dashboardRefreshTimer) return;
+  clearInterval(dashboardRefreshTimer);
+  dashboardRefreshTimer = null;
+}
+
+function startDashboardRefresh() {
+  stopDashboardRefresh();
+  dashboardRefreshTimer = setInterval(() => {
+    if (!token) return;
+    refreshHomePanel();
+  }, DASHBOARD_REFRESH_MS);
+}
+
 async function loadDashboard() {
   await loadMe();
   showApp();
-  await Promise.allSettled([loadClient(), loadSummary()]);
+  await Promise.allSettled([loadClient(), refreshHomePanel()]);
+  startDashboardRefresh();
 }
 
 async function bootstrap() {
@@ -875,6 +1064,7 @@ async function bootstrap() {
     } catch (err) {
       token = null;
       localStorage.removeItem("optimasol_token");
+      stopDashboardRefresh();
     }
   }
 

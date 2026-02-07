@@ -255,6 +255,61 @@ button:active {
   margin-top: 4px;
 }
 
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.home-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f9fafb;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.status-running,
+.status-connected {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+.status-stopped,
+.status-disconnected {
+  color: #991b1b;
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.status-warning {
+  color: #9a3412;
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+.status-unknown {
+  color: #374151;
+  background: rgba(107, 114, 128, 0.14);
+  border-color: rgba(107, 114, 128, 0.35);
+}
+
+.home-note {
+  margin-top: 8px;
+}
+
 .advanced summary {
   cursor: pointer;
   font-weight: 600;
@@ -384,6 +439,15 @@ button:active {
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.05);
   padding: 8px;
+}
+
+#forecast-today-chart {
+  width: 100%;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  padding: 8px;
+  margin-top: 6px;
 }
 
 #history-list {
